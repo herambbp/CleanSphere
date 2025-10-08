@@ -1,0 +1,14 @@
+output doc.docx
+claude.md
+.env
+New-Classifier/
+classifier-backup/
+Hate-speech-detection-backup/
+hate-speech-detection/envs
+hate-speech-detection/__pycache__
+hate-speech-detection/**/__pycache__/
+hate-speech-detection/saved_features/
+hate-speech-detection/saved_models/
+hate-speech-detection/results/
+data/
+src/
