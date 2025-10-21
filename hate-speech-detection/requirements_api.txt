@@ -1,0 +1,21 @@
+# FastAPI Requirements for Hate Speech Detection API
+
+# Core API Framework
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+pydantic==2.5.0
+
+# HTTP and CORS
+httpx==0.25.1
+python-multipart==0.0.6
+
+# Already included in main requirements
+numpy>=1.21.0
+pandas>=1.3.0
+scikit-learn>=1.0.0
+joblib>=1.1.0
+
+# Optional but recommended
+python-dotenv==1.0.0  # Environment variables
+redis==5.0.1  # Caching (optional)
+prometheus-fastapi-instrumentator==6.1.0  # Monitoring (optional)
