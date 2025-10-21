@@ -1,0 +1,562 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hate Speech Detection API - Demo</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .header {
+            text-align: center;
+            color: white;
+            margin-bottom: 30px;
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            font-size: 1.1em;
+            opacity: 0.9;
+        }
+
+        .card {
+            background: white;
+            border-radius: 12px;
+            padding: 30px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+
+        .input-section {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: #333;
+        }
+
+        textarea {
+            width: 100%;
+            padding: 15px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 16px;
+            font-family: inherit;
+            resize: vertical;
+            min-height: 120px;
+            transition: border-color 0.3s;
+        }
+
+        textarea:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .options {
+            display: flex;
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+
+        .checkbox-group {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .checkbox-group input {
+            width: 18px;
+            height: 18px;
+            cursor: pointer;
+        }
+
+        .button-group {
+            display: flex;
+            gap: 10px;
+        }
+
+        button {
+            padding: 12px 30px;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-secondary {
+            background: #f0f0f0;
+            color: #333;
+        }
+
+        .btn-secondary:hover {
+            background: #e0e0e0;
+        }
+
+        button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 20px;
+            color: #667eea;
+        }
+
+        .loading.active {
+            display: block;
+        }
+
+        .spinner {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 10px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .result {
+            display: none;
+            margin-top: 20px;
+        }
+
+        .result.active {
+            display: block;
+        }
+
+        .result-header {
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            font-weight: 600;
+        }
+
+        .result-hate {
+            background: #fee;
+            color: #c00;
+            border-left: 4px solid #c00;
+        }
+
+        .result-offensive {
+            background: #ffeaa7;
+            color: #d63031;
+            border-left: 4px solid #d63031;
+        }
+
+        .result-neither {
+            background: #dfe6e9;
+            color: #2d3436;
+            border-left: 4px solid #2d3436;
+        }
+
+        .result-details {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 15px;
+            margin-bottom: 15px;
+        }
+
+        .detail-item {
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 8px;
+        }
+
+        .detail-label {
+            font-size: 0.9em;
+            color: #666;
+            margin-bottom: 5px;
+        }
+
+        .detail-value {
+            font-size: 1.2em;
+            font-weight: 600;
+            color: #333;
+        }
+
+        .severity-badge {
+            display: inline-block;
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-size: 0.9em;
+            font-weight: 600;
+        }
+
+        .severity-LOW { background: #d4edda; color: #155724; }
+        .severity-MODERATE { background: #fff3cd; color: #856404; }
+        .severity-HIGH { background: #f8d7da; color: #721c24; }
+        .severity-SEVERE { background: #f5c6cb; color: #721c24; }
+        .severity-EXTREME { background: #dc3545; color: white; }
+
+        .explanation {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 15px;
+        }
+
+        .explanation h4 {
+            margin-bottom: 10px;
+            color: #333;
+        }
+
+        .explanation p {
+            color: #666;
+            line-height: 1.6;
+        }
+
+        .probabilities {
+            margin-top: 15px;
+        }
+
+        .prob-bar {
+            margin-bottom: 10px;
+        }
+
+        .prob-label {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 5px;
+            font-size: 0.9em;
+        }
+
+        .prob-bar-bg {
+            height: 10px;
+            background: #e0e0e0;
+            border-radius: 5px;
+            overflow: hidden;
+        }
+
+        .prob-bar-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+            transition: width 0.5s;
+        }
+
+        .examples {
+            margin-top: 20px;
+        }
+
+        .example-btn {
+            display: inline-block;
+            padding: 8px 15px;
+            margin: 5px;
+            background: #f0f0f0;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 0.9em;
+            transition: background 0.3s;
+        }
+
+        .example-btn:hover {
+            background: #e0e0e0;
+        }
+
+        .api-status {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+
+        .status-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #6c757d;
+        }
+
+        .status-dot.online {
+            background: #28a745;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🛡️ Hate Speech Detection</h1>
+            <p>Advanced AI-powered content moderation with explainable insights</p>
+        </div>
+
+        <div class="card">
+            <div class="api-status">
+                <div class="status-dot" id="statusDot"></div>
+                <span id="statusText">Checking API status...</span>
+            </div>
+
+            <div class="input-section">
+                <label for="textInput">Enter text to analyze:</label>
+                <textarea 
+                    id="textInput" 
+                    placeholder="Type or paste your text here...&#10;&#10;Try examples like:&#10;- 'I hate when my code doesn't work'&#10;- 'You're a fucking idiot'&#10;- 'Good morning everyone!'"
+                ></textarea>
+            </div>
+
+            <div class="options">
+                <div class="checkbox-group">
+                    <input type="checkbox" id="includeSeverity" checked>
+                    <label for="includeSeverity">Include Severity Analysis</label>
+                </div>
+                <div class="checkbox-group">
+                    <input type="checkbox" id="includeExplanation" checked>
+                    <label for="includeExplanation">Include AI Explanation</label>
+                </div>
+            </div>
+
+            <div class="button-group">
+                <button class="btn-primary" onclick="analyzeText()">
+                    🔍 Analyze Text
+                </button>
+                <button class="btn-secondary" onclick="clearResults()">
+                    Clear
+                </button>
+            </div>
+
+            <div class="examples">
+                <strong>Quick Examples:</strong><br>
+                <span class="example-btn" onclick="setExample('Good morning everyone! Have a great day!')">✅ Benign</span>
+                <span class="example-btn" onclick="setExample('I hate when my code doesn\'t work')">⚠️ Ambiguous</span>
+                <span class="example-btn" onclick="setExample('You\'re a fucking idiot')">❌ Offensive</span>
+                <span class="example-btn" onclick="setExample('I will kill you, you worthless trash')">🚫 Hate Speech</span>
+            </div>
+
+            <div class="loading" id="loading">
+                <div class="spinner"></div>
+                <p>Analyzing text...</p>
+            </div>
+
+            <div class="result" id="result"></div>
+        </div>
+    </div>
+
+    <script>
+        const API_URL = 'http://localhost:8000';
+
+        // Check API status on load
+        async function checkAPIStatus() {
+            try {
+                const response = await fetch(`${API_URL}/health`);
+                const data = await response.json();
+                
+                if (data.status === 'healthy') {
+                    document.getElementById('statusDot').classList.add('online');
+                    document.getElementById('statusText').textContent = 'API Online - Ready to analyze';
+                } else {
+                    document.getElementById('statusText').textContent = 'API Initializing...';
+                }
+            } catch (error) {
+                document.getElementById('statusText').textContent = 'API Offline - Please start the server';
+                console.error('API check failed:', error);
+            }
+        }
+
+        async function analyzeText() {
+            const text = document.getElementById('textInput').value.trim();
+            
+            if (!text) {
+                alert('Please enter some text to analyze');
+                return;
+            }
+
+            const includeSeverity = document.getElementById('includeSeverity').checked;
+            const includeExplanation = document.getElementById('includeExplanation').checked;
+
+            // Show loading
+            document.getElementById('loading').classList.add('active');
+            document.getElementById('result').classList.remove('active');
+
+            try {
+                const response = await fetch(`${API_URL}/classify`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        text: text,
+                        include_severity: includeSeverity,
+                        include_explanation: includeExplanation
+                    })
+                });
+
+                if (!response.ok) {
+                    throw new Error('API request failed');
+                }
+
+                const data = await response.json();
+                displayResult(data);
+            } catch (error) {
+                alert('Error analyzing text. Make sure the API is running.');
+                console.error('Analysis error:', error);
+            } finally {
+                document.getElementById('loading').classList.remove('active');
+            }
+        }
+
+        function displayResult(data) {
+            const resultDiv = document.getElementById('result');
+            
+            // Determine result class
+            let resultClass = 'result-neither';
+            if (data.class_id === 0) resultClass = 'result-hate';
+            else if (data.class_id === 1) resultClass = 'result-offensive';
+
+            let html = `
+                <div class="result-header ${resultClass}">
+                    <strong>Classification:</strong> ${data.prediction}
+                    <span style="float: right;">Confidence: ${(data.confidence * 100).toFixed(1)}%</span>
+                </div>
+
+                <div class="result-details">
+                    <div class="detail-item">
+                        <div class="detail-label">Prediction</div>
+                        <div class="detail-value">${data.prediction}</div>
+                    </div>
+                    <div class="detail-item">
+                        <div class="detail-label">Confidence</div>
+                        <div class="detail-value">${(data.confidence * 100).toFixed(1)}%</div>
+                    </div>
+                    <div class="detail-item">
+                        <div class="detail-label">Model</div>
+                        <div class="detail-value">${data.model_info.name}</div>
+                    </div>
+            `;
+
+            // Add severity if available
+            if (data.severity) {
+                html += `
+                    <div class="detail-item">
+                        <div class="detail-label">Severity</div>
+                        <div class="detail-value">
+                            <span class="severity-badge severity-${data.severity.label}">
+                                ${data.severity.label}
+                            </span>
+                        </div>
+                    </div>
+                `;
+            }
+
+            html += `</div>`;
+
+            // Add probabilities
+            html += `
+                <div class="probabilities">
+                    <h4>Probability Breakdown</h4>
+            `;
+
+            for (const [className, prob] of Object.entries(data.probabilities)) {
+                html += `
+                    <div class="prob-bar">
+                        <div class="prob-label">
+                            <span>${className}</span>
+                            <span>${(prob * 100).toFixed(1)}%</span>
+                        </div>
+                        <div class="prob-bar-bg">
+                            <div class="prob-bar-fill" style="width: ${prob * 100}%"></div>
+                        </div>
+                    </div>
+                `;
+            }
+
+            html += `</div>`;
+
+            // Add explanation if available
+            if (data.explanation) {
+                html += `
+                    <div class="explanation">
+                        <h4>🤖 AI Explanation</h4>
+                        <p>${data.explanation.summary}</p>
+                    </div>
+                `;
+            }
+
+            // Add severity explanation if available
+            if (data.severity && data.severity.explanation) {
+                html += `
+                    <div class="explanation">
+                        <h4>📊 Severity Analysis</h4>
+                        <p>${data.severity.explanation}</p>
+                    </div>
+                `;
+            }
+
+            // Add action if available
+            if (data.action) {
+                html += `
+                    <div class="explanation">
+                        <h4>⚡ Recommended Action</h4>
+                        <p><strong>Urgency:</strong> ${data.action.urgency}</p>
+                        <p><strong>Action:</strong> ${data.action.description}</p>
+                    </div>
+                `;
+            }
+
+            resultDiv.innerHTML = html;
+            resultDiv.classList.add('active');
+        }
+
+        function setExample(text) {
+            document.getElementById('textInput').value = text;
+        }
+
+        function clearResults() {
+            document.getElementById('textInput').value = '';
+            document.getElementById('result').classList.remove('active');
+        }
+
+        // Check API status on page load
+        checkAPIStatus();
+    </script>
+</body>
+</html>
