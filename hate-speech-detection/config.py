@@ -607,3 +607,16 @@ CLASS_DISTRIBUTION = {
     'offensive': {'percentage': 77.4, 'weight': 1.0},
     'neither': {'percentage': 16.8, 'weight': 4.6}
 }
+
+# ==================== EXPLAINABILITY CONFIG ====================
+
+# LIME Configuration
+LIME_CONFIG = {
+    'num_samples': 1000,      # Number of samples for LIME
+    'num_features': 10        # Number of features to show
+}
+
+# SHAP Configuration (optional)
+SHAP_CONFIG = {
+    'max_display': 10         # Max features to display
+}
