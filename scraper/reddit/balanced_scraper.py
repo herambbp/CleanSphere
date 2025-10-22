@@ -1,6 +1,5 @@
 """
 Balanced Comment Scraper with Live Annotation Display
-Option E: Hybrid Approach with targeted scraping + iterative tracking
 
 Features:
 - Targets specific sources for each class
