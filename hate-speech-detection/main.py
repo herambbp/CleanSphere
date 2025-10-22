@@ -1,26 +1,30 @@
 """
-FastAPI Backend for Hate Speech Detection System
-Provides RESTful API endpoints for classification, explanation, and moderation
+FastAPI Backend for Hate Speech Detection System with CSV Processing
+Provides RESTful API endpoints for classification, explanation, moderation, and CSV batch processing
 
 Features:
 - Single text classification
 - Batch classification
+- CSV file processing with user analytics
 - Explainable predictions
 - Severity analysis
 - Content moderation
-- Appeal generation
-- Health checks
+- User dashboard analytics
 """
 
-from fastapi import FastAPI, HTTPException, BackgroundTasks, status
+from fastapi import FastAPI, HTTPException, BackgroundTasks, status, File, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, FileResponse
 from pydantic import BaseModel, Field, validator
 from typing import List, Optional, Dict, Any
 from datetime import datetime
+from pathlib import Path
+import tempfile
+import shutil
 import logging
 import sys
-from pathlib import Path
+import pandas as pd
+import numpy as np
 
 # Add project root to path
 sys.path.append(str(Path(__file__).parent))
@@ -33,6 +37,13 @@ from inference.explainable_classifier import (
 )
 from config import CLASS_LABELS, SEVERITY_LEVELS
 
+# Import CSV processor
+try:
+    from csv_processor import CSVProcessor
+    HAS_CSV_PROCESSOR = True
+except ImportError:
+    HAS_CSV_PROCESSOR = False
+
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
@@ -43,9 +54,9 @@ logger = logging.getLogger(__name__)
 # ==================== FASTAPI APP ====================
 
 app = FastAPI(
-    title="Hate Speech Detection API",
-    description="Advanced hate speech detection with explainable AI, severity analysis, and moderation recommendations",
-    version="1.0.0",
+    title="Hate Speech Detection API with CSV Processing",
+    description="Advanced hate speech detection with explainable AI, severity analysis, CSV batch processing, and user analytics dashboard",
+    version="2.0.0",
     docs_url="/docs",
     redoc_url="/redoc"
 )
@@ -131,25 +142,26 @@ class BatchClassificationResponse(BaseModel):
     timestamp: str
 
 
-class ModerationResponse(BaseModel):
-    """Content moderation response"""
-    input: str
-    should_remove: bool
-    class_id: int
-    reason: str
-    severity: Optional[str] = None
-    action: Optional[str] = None
-    confidence: float
+class CSVProcessingResponse(BaseModel):
+    """CSV processing response"""
+    status: str
+    total_comments: int
+    total_users: int
+    summary: Dict[str, Any]
+    user_analytics: Dict[str, Any]
+    top_risk_users: List[Dict[str, Any]]
     timestamp: str
 
 
-class AppealResponse(BaseModel):
-    """Appeal response"""
-    original_text: str
-    classification: str
-    confidence: float
-    appeal_message: str
-    timestamp: str
+class UserAnalyticsResponse(BaseModel):
+    """User analytics response"""
+    user: str
+    total_comments: int
+    hate_percentage: float
+    offensive_percentage: float
+    risk_score: float
+    risk_level: str
+    most_severe_comment: Dict[str, Any]
 
 
 class HealthResponse(BaseModel):
@@ -157,6 +169,7 @@ class HealthResponse(BaseModel):
     status: str
     timestamp: str
     model_loaded: bool
+    csv_processor_available: bool
     version: str
 
 # ==================== UTILITY FUNCTIONS ====================
@@ -202,16 +215,33 @@ def format_classification_response(result: Dict, include_severity: bool, include
     
     return response
 
-# ==================== API ENDPOINTS ====================
+
+def get_top_risk_users(user_analytics: Dict, top_n: int = 10) -> List[Dict]:
+    """Get top N users by risk score"""
+    users = []
+    for username, analytics in user_analytics.items():
+        users.append({
+            'user': username,
+            'risk_score': analytics['risk_score'],
+            'risk_level': analytics['risk_level'],
+            'hate_percentage': analytics['hate_percentage'],
+            'total_comments': analytics['total_comments']
+        })
+    
+    users.sort(key=lambda x: x['risk_score'], reverse=True)
+    return users[:top_n]
+
+# ==================== BASIC API ENDPOINTS ====================
 
 @app.get("/", response_model=Dict[str, str])
 async def root():
     """Root endpoint - API information"""
     return {
-        "message": "Hate Speech Detection API",
-        "version": "1.0.0",
+        "message": "Hate Speech Detection API with CSV Processing",
+        "version": "2.0.0",
         "docs": "/docs",
-        "health": "/health"
+        "health": "/health",
+        "features": "Classification, Severity Analysis, CSV Processing, User Analytics"
     }
 
 
@@ -226,12 +256,14 @@ async def health_check():
             status="healthy" if model_loaded else "initializing",
             timestamp=datetime.utcnow().isoformat(),
             model_loaded=model_loaded,
-            version="1.0.0"
+            csv_processor_available=HAS_CSV_PROCESSOR,
+            version="2.0.0"
         )
     except Exception as e:
         logger.error(f"Health check failed: {e}")
         raise HTTPException(status_code=500, detail="Health check failed")
 
+# ==================== CLASSIFICATION ENDPOINTS ====================
 
 @app.post("/classify", response_model=ClassificationResponse)
 async def classify_text(input_data: TextInput):
@@ -247,14 +279,12 @@ async def classify_text(input_data: TextInput):
     try:
         clf = get_classifier()
         
-        # Classify with requested features
         result = clf.classify_with_explanation(
             text=input_data.text,
             include_severity=input_data.include_severity,
             verbose=False
         )
         
-        # Format response
         response = format_classification_response(
             result,
             input_data.include_severity,
@@ -306,16 +336,13 @@ async def classify_batch(input_data: BatchTextInput):
                 
                 results.append(ClassificationResponse(**response))
                 
-                # Count predictions
                 pred = response["prediction"]
                 predictions_count[pred] = predictions_count.get(pred, 0) + 1
                 
             except Exception as e:
                 logger.error(f"Error classifying text '{text[:30]}...': {e}")
-                # Continue with other texts
                 continue
         
-        # Calculate summary
         summary = {
             "total_classified": len(results),
             "predictions_breakdown": predictions_count,
@@ -340,120 +367,180 @@ async def classify_batch(input_data: BatchTextInput):
             detail=f"Batch classification failed: {str(e)}"
         )
 
+# ==================== CSV PROCESSING ENDPOINTS ====================
 
-@app.post("/moderate", response_model=ModerationResponse)
-async def moderate_content(input_data: TextInput):
+import numpy as np
+import pandas as pd
+
+def make_json_serializable(obj):
+    """Convert numpy/pandas types to JSON-serializable Python types"""
+    if isinstance(obj, dict):
+        return {key: make_json_serializable(value) for key, value in obj.items()}
+    elif isinstance(obj, list):
+        return [make_json_serializable(item) for item in obj]
+    elif isinstance(obj, (np.integer, np.int64, np.int32)):
+        return int(obj)
+    elif isinstance(obj, (np.floating, np.float64, np.float32)):
+        return float(obj)
+    elif isinstance(obj, np.ndarray):
+        return obj.tolist()
+    elif isinstance(obj, (pd.Timestamp, datetime)):
+        return obj.isoformat()
+    elif pd.isna(obj):
+        return None
+    else:
+        return obj
+
+@app.post("/process-csv")
+async def process_csv_file(file: UploadFile = File(...)):
     """
-    Moderate content - returns moderation decision
+    Process uploaded CSV file with user comments
     
-    - **text**: Content to moderate
+    Expected CSV format:
+    - name/user/username: User identifier
+    - timestamp/date/time: Comment timestamp  
+    - comment/text/message: Comment text
     
-    Returns moderation decision with action recommendation
+    Returns processing results and user analytics dashboard data
     """
+    if not HAS_CSV_PROCESSOR:
+        raise HTTPException(
+            status_code=501,
+            detail="CSV processing not available. Please ensure csv_processor.py is in the project directory."
+        )
+    
+    if not file.filename.endswith('.csv'):
+        raise HTTPException(
+            status_code=400,
+            detail="File must be a CSV file (.csv extension required)"
+        )
+    
+    temp_path = None
     try:
-        clf = get_classifier()
+        # Save uploaded file temporarily
+        with tempfile.NamedTemporaryFile(delete=False, suffix='.csv') as temp_file:
+            shutil.copyfileobj(file.file, temp_file)
+            temp_path = temp_file.name
         
-        result = clf.classify_with_explanation(
-            text=input_data.text,
-            include_severity=True,
-            verbose=False
-        )
+        logger.info(f"Processing uploaded CSV: {file.filename}")
         
-        # Determine if content should be removed
-        class_id = result.get("class", 2)
-        should_remove = class_id in [0, 1]  # Hate speech or Offensive
+        # Process CSV
+        processor = CSVProcessor()
+        results_df = processor.process_csv(temp_path)
         
-        # Get explanation summary
-        explanation_summary = get_explanation_summary(input_data.text)
+        # Get analytics
+        user_analytics = processor.get_user_analytics()
+        summary = processor.generate_summary_report()
         
-        response = ModerationResponse(
-            input=input_data.text,
-            should_remove=should_remove,
-            class_id=class_id,
-            reason=explanation_summary,
-            severity=result.get("severity", {}).get("severity_label") if "severity" in result else None,
-            action=result.get("action", {}).get("primary_action") if "action" in result else None,
-            confidence=result.get("confidence", 0.0),
-            timestamp=datetime.utcnow().isoformat()
-        )
+        logger.info(f"CSV processed: {len(results_df)} comments from {len(user_analytics)} users")
         
-        logger.info(f"Moderated content: {input_data.text[:50]}... -> {'REMOVE' if should_remove else 'ALLOW'}")
+        # Prepare response - CONVERT TO JSON-SERIALIZABLE FORMAT
+        response = {
+            "status": "success",
+            "total_comments": int(len(results_df)),  # Ensure int
+            "total_users": int(len(user_analytics)),  # Ensure int
+            "summary": make_json_serializable(summary),
+            "user_analytics": make_json_serializable(user_analytics),
+            "top_risk_users": make_json_serializable(get_top_risk_users(user_analytics, 10)),
+            "timestamp": datetime.utcnow().isoformat()
+        }
         
-        return response
+        return JSONResponse(content=response)
         
+    except ValueError as e:
+        logger.error(f"CSV validation error: {e}")
+        raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
-        logger.error(f"Moderation error: {e}")
+        logger.error(f"CSV processing error: {e}")
         raise HTTPException(
             status_code=500,
-            detail=f"Moderation failed: {str(e)}"
+            detail=f"Failed to process CSV: {str(e)}"
         )
+    finally:
+        # Cleanup temp file
+        if temp_path and Path(temp_path).exists():
+            try:
+                Path(temp_path).unlink()
+            except Exception as e:
+                logger.warning(f"Failed to cleanup temp file: {e}")
 
-
-@app.post("/appeal", response_model=AppealResponse)
-async def generate_appeal_response(input_data: TextInput):
+@app.post("/process-csv/detailed")
+async def process_csv_detailed(file: UploadFile = File(...)):
     """
-    Generate appeal response for flagged content
+    Process CSV and return detailed per-comment results
     
-    - **text**: Flagged content
-    
-    Returns appeal response with explanation
+    Returns all classification results for each comment
     """
+    if not HAS_CSV_PROCESSOR:
+        raise HTTPException(
+            status_code=501,
+            detail="CSV processing not available"
+        )
+    
+    if not file.filename.endswith('.csv'):
+        raise HTTPException(
+            status_code=400,
+            detail="File must be a CSV file"
+        )
+    
+    temp_path = None
     try:
-        clf = get_classifier()
+        # Save uploaded file
+        with tempfile.NamedTemporaryFile(delete=False, suffix='.csv') as temp_file:
+            shutil.copyfileobj(file.file, temp_file)
+            temp_path = temp_file.name
         
-        result = clf.classify_with_explanation(
-            text=input_data.text,
-            methods=["lime", "keywords"],
-            include_severity=False,
-            verbose=False
-        )
+        # Process CSV
+        processor = CSVProcessor()
+        results_df = processor.process_csv(temp_path)
         
-        prediction = result.get("prediction", "unknown")
-        confidence = result.get("confidence", 0.0)
+        # Convert to JSON
+        results = results_df.to_dict('records')
         
-        # Generate appeal message
-        appeal_message = f"""Your content was flagged as: {prediction}
-
-Classification confidence: {confidence:.1%}
-
-Our AI system detected potentially harmful content. If you believe this is a mistake, please:
-
-1. Review our community guidelines
-2. Provide context for your content
-3. Contact our support team with this classification ID
-
-Thank you for your understanding."""
+        # Convert timestamps to strings
+        for result in results:
+            if 'timestamp' in result and pd.notna(result['timestamp']):
+                result['timestamp'] = str(result['timestamp'])
         
-        response = AppealResponse(
-            original_text=input_data.text,
-            classification=prediction,
-            confidence=confidence,
-            appeal_message=appeal_message,
-            timestamp=datetime.utcnow().isoformat()
-        )
-        
-        logger.info(f"Generated appeal for: {input_data.text[:50]}...")
-        
-        return response
+        return {
+            "status": "success",
+            "total_comments": len(results),
+            "results": results,
+            "timestamp": datetime.utcnow().isoformat()
+        }
         
     except Exception as e:
-        logger.error(f"Appeal generation error: {e}")
+        logger.error(f"CSV processing error: {e}")
         raise HTTPException(
             status_code=500,
-            detail=f"Appeal generation failed: {str(e)}"
+            detail=f"Failed to process CSV: {str(e)}"
         )
+    finally:
+        if temp_path and Path(temp_path).exists():
+            try:
+                Path(temp_path).unlink()
+            except:
+                pass
+
+# ==================== INFO ENDPOINTS ====================
+
+@app.get("/classes", response_model=Dict[int, str])
+async def get_classes():
+    """Get available classification classes"""
+    return CLASS_LABELS
+
+
+@app.get("/severity-levels", response_model=Dict[int, str])
+async def get_severity_levels():
+    """Get available severity levels"""
+    return SEVERITY_LEVELS
 
 
 @app.get("/models/info", response_model=Dict[str, Any])
 async def get_model_info():
-    """
-    Get information about loaded models
-    
-    Returns model metadata and configuration
-    """
+    """Get information about loaded models"""
     try:
         clf = get_classifier()
-        
         info = clf.get_model_info()
         
         return {
@@ -469,26 +556,6 @@ async def get_model_info():
             status_code=500,
             detail=f"Failed to get model info: {str(e)}"
         )
-
-
-@app.get("/classes", response_model=Dict[int, str])
-async def get_classes():
-    """
-    Get available classification classes
-    
-    Returns mapping of class IDs to class names
-    """
-    return CLASS_LABELS
-
-
-@app.get("/severity-levels", response_model=Dict[int, str])
-async def get_severity_levels():
-    """
-    Get available severity levels
-    
-    Returns mapping of severity levels to labels
-    """
-    return SEVERITY_LEVELS
 
 # ==================== ERROR HANDLERS ====================
 
@@ -524,9 +591,11 @@ async def general_exception_handler(request, exc):
 async def startup_event():
     """Run on API startup"""
     logger.info("=" * 80)
-    logger.info("Hate Speech Detection API - Starting Up")
+    logger.info("Hate Speech Detection API v2.0 - Starting Up")
     logger.info("=" * 80)
+    logger.info("Features: Classification, Severity Analysis, CSV Processing, User Analytics")
     logger.info("API is ready to accept requests")
+    logger.info(f"CSV Processor: {'Available' if HAS_CSV_PROCESSOR else 'Not Available'}")
     logger.info("Classifier will be loaded on first request")
     logger.info("=" * 80)
 
@@ -545,11 +614,13 @@ if __name__ == "__main__":
     import uvicorn
     
     print("=" * 80)
-    print("HATE SPEECH DETECTION API")
+    print("HATE SPEECH DETECTION API v2.0")
+    print("With CSV Processing & User Analytics Dashboard")
     print("=" * 80)
     print("\nStarting server...")
     print("Docs available at: http://localhost:8000/docs")
     print("Health check at: http://localhost:8000/health")
+    print("CSV Upload at: http://localhost:8000/docs#/default/process_csv_file_process_csv_post")
     print("=" * 80)
     
     uvicorn.run(
