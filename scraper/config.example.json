@@ -1,0 +1,51 @@
+{
+  "api_keys": {
+    "openai_api_key": "your-openai-api-key-here",
+    "reddit_client_id": "your-reddit-client-id-here",
+    "reddit_client_secret": "your-reddit-client-secret-here",
+    "youtube_api_key": "your-youtube-api-key-here",
+    "twitter_bearer_token": "your-twitter-bearer-token-here"
+  },
+  
+  "scraper_settings": {
+    "target_per_class": 3333,
+    "output_file": "balanced_dataset_10k.csv",
+    "gpt_model": "gpt-4o-mini",
+    "reddit_user_agent": "BalancedScraper/1.0"
+  },
+  
+  "subreddit_sources": {
+    "hate_speech": [
+      "unpopularopinion",
+      "TrueOffMyChest",
+      "rant",
+      "AmItheAsshole"
+    ],
+    "offensive_language": [
+      "gaming",
+      "sports",
+      "nba",
+      "soccer",
+      "RoastMe",
+      "relationship_advice",
+      "PublicFreakout"
+    ],
+    "neither": [
+      "science",
+      "technology",
+      "explainlikeimfive",
+      "todayilearned",
+      "askscience",
+      "Documentaries",
+      "books"
+    ]
+  },
+  
+  "advanced_settings": {
+    "rate_limit_delay": 1.5,
+    "batch_size": 20,
+    "max_retries": 3,
+    "save_progress_every": 10,
+    "gpt_temperature": 0.3
+  }
+}
