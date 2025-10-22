@@ -1,5 +1,3 @@
-output doc.docx
-claude.md
 .env
 New-Classifier/
 classifier-backup/
