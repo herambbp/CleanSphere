@@ -1,13 +1,13 @@
 HATE SPEECH ANNOTATION SUMMARY
 ======================================================================
 
-Timestamp: 2025-10-22 15:35:55
+Timestamp: 2025-10-22 16:04:11
 Total Rows: 100
 
 Label Distribution:
-  - Hate Speech: 64 (64.00%)
-  - Offensive Language: 18 (18.00%)
-  - Neither: 18 (18.00%)
+  - Hate Speech: 71 (71.00%)
+  - Offensive Language: 6 (6.00%)
+  - Neither: 23 (23.00%)
 
-API Calls: 6
-Errors: 1
+API Calls: 7
+Errors: 0

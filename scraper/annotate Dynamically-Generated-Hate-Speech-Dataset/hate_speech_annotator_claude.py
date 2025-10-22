@@ -1,39 +1,34 @@
 #!/usr/bin/env python3
 """
-Hate Speech Dataset Annotation System
-Using Meta Llama 3.3 70B Instruct via OpenRouter API
-Features: Batch processing, live progress, checkpointing, cost tracking
+Hate Speech Dataset Annotation System - CLAUDE VERSION
+Using Anthropic Claude API (no content moderation issues for research)
 """
 
 import pandas as pd
 import json
 import time
-from openai import OpenAI
-from typing import List, Dict, Tuple
+from anthropic import Anthropic
+from typing import List, Dict
 import os
 from datetime import datetime
 from tqdm import tqdm
 import sys
 
-class HateSpeechAnnotator:
+class HateSpeechAnnotatorClaude:
     def __init__(self, api_key: str, batch_size: int = 15, checkpoint_interval: int = 1000):
         """
-        Initialize the annotator
+        Initialize the annotator with Claude
         
         Args:
-            api_key: OpenRouter API key
-            batch_size: Number of texts to process per API call (10-20 recommended)
+            api_key: Anthropic API key
+            batch_size: Number of texts to process per API call
             checkpoint_interval: Save progress every N rows
         """
-        self.client = OpenAI(
-            base_url="https://openrouter.ai/api/v1",
-            api_key=api_key
-        )
+        self.client = Anthropic(api_key=api_key)
         self.batch_size = batch_size
         self.checkpoint_interval = checkpoint_interval
-        self.model = "openai/gpt-4o-mini"  # Changed from Llama due to Meta moderation blocking hate speech research
+        self.model = "claude-sonnet-4-5-20250929"
         
-        # Statistics tracking
         self.stats = {
             'hate_speech': 0,
             'offensive_language': 0,
@@ -44,16 +39,8 @@ class HateSpeechAnnotator:
         }
         
     def create_annotation_prompt(self, texts_with_context: List[Dict]) -> str:
-        """
-        Create a batch prompt for multiple texts with context
-        
-        Args:
-            texts_with_context: List of dicts containing text and metadata
-            
-        Returns:
-            Formatted prompt string
-        """
-        prompt = """You are a hate speech detection expert. Classify each text into exactly one category:
+        """Create a batch prompt for multiple texts with context"""
+        prompt = """You are a hate speech detection expert analyzing content for academic research purposes. Classify each text into exactly one category:
 
 **Categories:**
 0 = hate_speech - Content that expresses hate, violence, or severe prejudice against individuals or groups based on protected characteristics (race, ethnicity, religion, gender, sexual orientation, disability, etc.)
@@ -63,8 +50,8 @@ class HateSpeechAnnotator:
 **Instructions:**
 - Consider the context provided for each text
 - Be consistent and objective
+- This is for academic research on hate speech detection
 - Return ONLY a JSON array with your classifications
-- Each classification must have: text_id, category (0/1/2), confidence (0.0-1.0)
 
 **Texts to classify:**
 
@@ -91,44 +78,29 @@ Return ONLY the JSON array, no other text."""
         return prompt
     
     def annotate_batch(self, texts_with_context: List[Dict]) -> List[Dict]:
-        """
-        Annotate a batch of texts using the API
-        
-        Args:
-            texts_with_context: List of texts with metadata
-            
-        Returns:
-            List of annotations
-        """
+        """Annotate a batch of texts using Claude API"""
         try:
             prompt = self.create_annotation_prompt(texts_with_context)
             
-            completion = self.client.chat.completions.create(
-                extra_headers={
-                    "HTTP-Referer": "https://hate-speech-research.com",
-                    "X-Title": "Hate Speech Research Annotator",
-                },
+            message = self.client.messages.create(
                 model=self.model,
+                max_tokens=2000,
+                temperature=0.1,
+                system="You are a hate speech classification expert conducting academic research. Always respond with valid JSON only.",
                 messages=[
-                    {
-                        "role": "system",
-                        "content": "You are a hate speech classification expert. Always respond with valid JSON only."
-                    },
                     {
                         "role": "user",
                         "content": prompt
                     }
-                ],
-                temperature=0.1,  # Low temperature for consistency
-                max_tokens=2000
+                ]
             )
             
             self.stats['api_calls'] += 1
             
             # Parse response
-            response_text = completion.choices[0].message.content.strip()
+            response_text = message.content[0].text.strip()
             
-            # Extract JSON from response (handle cases where model adds extra text)
+            # Extract JSON from response
             if '```json' in response_text:
                 response_text = response_text.split('```json')[1].split('```')[0].strip()
             elif '```' in response_text:
@@ -140,28 +112,16 @@ Return ONLY the JSON array, no other text."""
             
         except json.JSONDecodeError as e:
             print(f"\n⚠️  JSON parsing error: {e}")
-            print(f"Response was: {response_text[:200]}...")
             self.stats['errors'] += 1
-            # Return default classifications
             return [{"text_id": i+1, "category": 2, "confidence": 0.0} for i in range(len(texts_with_context))]
             
         except Exception as e:
             print(f"\n⚠️  API error: {e}")
             self.stats['errors'] += 1
-            # Return default classifications
             return [{"text_id": i+1, "category": 2, "confidence": 0.0} for i in range(len(texts_with_context))]
     
     def prepare_context_string(self, row: pd.Series, exclude_cols: List[str]) -> str:
-        """
-        Prepare context string from all columns except text
-        
-        Args:
-            row: DataFrame row
-            exclude_cols: Columns to exclude from context
-            
-        Returns:
-            Formatted context string
-        """
+        """Prepare context string from all columns except text"""
         context_parts = []
         for col in row.index:
             if col not in exclude_cols and pd.notna(row[col]) and row[col] != '':
@@ -171,19 +131,8 @@ Return ONLY the JSON array, no other text."""
     
     def process_dataset(self, input_csv: str, output_csv: str, sample_size: int = None, 
                        resume_from: str = None) -> pd.DataFrame:
-        """
-        Process the entire dataset with batch annotation
-        
-        Args:
-            input_csv: Path to input CSV file
-            output_csv: Path to save annotated CSV
-            sample_size: If set, only process this many rows (for testing)
-            resume_from: Path to checkpoint file to resume from
-            
-        Returns:
-            Annotated DataFrame
-        """
-        print("🚀 Starting Hate Speech Annotation System")
+        """Process the entire dataset with batch annotation"""
+        print("🚀 Starting Hate Speech Annotation System (Claude)")
         print(f"📊 Model: {self.model}")
         print(f"📦 Batch size: {self.batch_size}")
         print(f"💾 Checkpoint interval: {self.checkpoint_interval} rows")
@@ -209,7 +158,7 @@ Return ONLY the JSON array, no other text."""
             df.iloc[:start_idx] = checkpoint_df
             print(f"✓ Resumed from row {start_idx}")
         
-        # Add output columns if they don't exist
+        # Add output columns
         if 'count' not in df.columns:
             df.insert(0, 'count', range(len(df)))
         if 'hate_speech' not in df.columns:
@@ -223,7 +172,7 @@ Return ONLY the JSON array, no other text."""
         if 'tweet' not in df.columns:
             df['tweet'] = df['text'] if 'text' in df.columns else ''
         
-        # Identify text column (handle different naming)
+        # Identify text column
         text_col = 'text' if 'text' in df.columns else 'tweet'
         
         # Batch processing
@@ -245,7 +194,7 @@ Return ONLY the JSON array, no other text."""
                         exclude_cols=['count', 'hate_speech', 'offensive_language', 'neither', 'class', 'tweet', text_col]
                     )
                     texts_with_context.append({
-                        'id': idx - i + 1,  # Relative ID within batch
+                        'id': idx - i + 1,
                         'text': str(row[text_col]),
                         'context': context
                     })
@@ -253,7 +202,7 @@ Return ONLY the JSON array, no other text."""
                 # Get annotations
                 annotations = self.annotate_batch(texts_with_context)
                 
-                # Apply annotations to dataframe
+                # Apply annotations
                 for j, annotation in enumerate(annotations):
                     row_idx = i + j
                     if row_idx >= len(df):
@@ -261,13 +210,11 @@ Return ONLY the JSON array, no other text."""
                     
                     category = annotation.get('category', 2)
                     
-                    # Update columns
                     df.at[row_idx, 'hate_speech'] = 1 if category == 0 else 0
                     df.at[row_idx, 'offensive_language'] = 1 if category == 1 else 0
                     df.at[row_idx, 'neither'] = 1 if category == 2 else 0
                     df.at[row_idx, 'class'] = category
                     
-                    # Update stats
                     if category == 0:
                         self.stats['hate_speech'] += 1
                     elif category == 1:
@@ -277,7 +224,6 @@ Return ONLY the JSON array, no other text."""
                     
                     self.stats['total_processed'] += 1
                 
-                # Update progress bar with current stats
                 pbar.set_postfix({
                     'Hate': self.stats['hate_speech'],
                     'Offensive': self.stats['offensive_language'],
@@ -289,24 +235,21 @@ Return ONLY the JSON array, no other text."""
                 # Checkpoint save
                 if (i + self.batch_size) % self.checkpoint_interval < self.batch_size:
                     df.to_csv(checkpoint_path, index=False)
-                    # Print live stats
                     print(f"\n💾 Checkpoint saved at row {i + self.batch_size}")
                     self.print_live_stats()
                 
-                # Rate limiting (avoid hitting API limits)
+                # Rate limiting
                 time.sleep(0.5)
         
         # Save final output
         print(f"\n💾 Saving final output to {output_csv}...")
         
-        # Reorder columns to match required format
         output_cols = ['count', 'hate_speech', 'offensive_language', 'neither', 'class', 'tweet']
-       
-        final_cols = output_cols
+        remaining_cols = [col for col in df.columns if col not in output_cols]
+        final_cols = output_cols + remaining_cols
         
         df[final_cols].to_csv(output_csv, index=False)
         
-        # Clean up checkpoint
         if os.path.exists(checkpoint_path):
             os.remove(checkpoint_path)
         
@@ -350,73 +293,49 @@ Return ONLY the JSON array, no other text."""
         print(f"\n🔧 Processing Statistics:")
         print(f"  API Calls Made:       {self.stats['api_calls']:,}")
         print(f"  Errors Encountered:   {self.stats['errors']:,}")
-        print(f"  Avg Batch Size:       {total/self.stats['api_calls']:.1f}")
         
         print(f"\n💰 Cost Estimation:")
         print(f"  Model Used:           {self.model}")
-        print(f"  Cost:                 ~$5-10 for 121K rows (GPT-4o-mini)")
+        print(f"  Cost:                 ~$15-30 for 121K rows")
         
         print("=" * 70)
-        
-        # Save summary to text file
-        summary_file = "annotation_summary.txt"
-        with open(summary_file, 'w') as f:
-            f.write("HATE SPEECH ANNOTATION SUMMARY\n")
-            f.write("=" * 70 + "\n\n")
-            f.write(f"Timestamp: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
-            f.write(f"Total Rows: {total:,}\n\n")
-            f.write(f"Label Distribution:\n")
-            f.write(f"  - Hate Speech: {hate_count:,} ({hate_count/total*100:.2f}%)\n")
-            f.write(f"  - Offensive Language: {offensive_count:,} ({offensive_count/total*100:.2f}%)\n")
-            f.write(f"  - Neither: {neither_count:,} ({neither_count/total*100:.2f}%)\n")
-            f.write(f"\nAPI Calls: {self.stats['api_calls']:,}\n")
-            f.write(f"Errors: {self.stats['errors']:,}\n")
-        
-        print(f"\n📄 Summary saved to: {summary_file}")
 
 
 def main():
     """Main execution function"""
     
-    # Configuration
-    API_KEY = os.getenv('OPENROUTER_API_KEY')
+    API_KEY = os.getenv('ANTHROPIC_API_KEY')
     
     if not API_KEY:
-        print("❌ Error: OPENROUTER_API_KEY environment variable not set")
-        print("Please set it with: export OPENROUTER_API_KEY='your-api-key'")
+        print("❌ Error: ANTHROPIC_API_KEY environment variable not set")
+        print("Please set it with: export ANTHROPIC_API_KEY='your-api-key'")
+        print("Get your API key from: https://console.anthropic.com")
         sys.exit(1)
     
-    INPUT_CSV = "Dynamically Generated Hate Dataset v0.2.3.csv"  # Change this to your input file
-    OUTPUT_CSV = "annotated_dataset.csv"
-    SAMPLE_SIZE = None  # Set to None for full dataset, or a number for testing
-    BATCH_SIZE = 15  # 10-20 recommended for cost efficiency
-    CHECKPOINT_INTERVAL = 1000
+    INPUT_CSV = "input_dataset.csv"
+    OUTPUT_CSV = "annotated_dataset_claude.csv"
+    SAMPLE_SIZE = 100  # Set to None for full dataset
     
-    # Initialize annotator
-    annotator = HateSpeechAnnotator(
+    annotator = HateSpeechAnnotatorClaude(
         api_key=API_KEY,
-        batch_size=BATCH_SIZE,
-        checkpoint_interval=CHECKPOINT_INTERVAL
+        batch_size=15,
+        checkpoint_interval=1000
     )
     
-    # Process dataset
     try:
         df = annotator.process_dataset(
             input_csv=INPUT_CSV,
             output_csv=OUTPUT_CSV,
-            sample_size=SAMPLE_SIZE  # Remove or set to None for full dataset
+            sample_size=SAMPLE_SIZE
         )
         
-        # Print final summary
         annotator.print_final_summary(df)
         
     except FileNotFoundError:
         print(f"❌ Error: Input file '{INPUT_CSV}' not found")
-        print("Please place your CSV file in the same directory and update INPUT_CSV variable")
         sys.exit(1)
     except Exception as e:
         print(f"\n❌ Error occurred: {e}")
-        print(f"\n💾 Progress saved in checkpoint file. You can resume later.")
         raise
 
 
