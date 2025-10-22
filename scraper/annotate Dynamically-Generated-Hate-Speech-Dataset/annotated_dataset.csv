@@ -4,11 +4,11 @@ count,hate_speech,offensive_language,neither,class,tweet
 2,1,0,0,0,Arabs are not welcome
 3,1,0,0,0,I'm not saying we should actually eliminate heebs.. I just wish they naturally became extinct
 4,1,0,0,0,bananas are for black people
-5,0,1,0,1,asian people are the shit
+5,0,0,1,2,asian people are the shit
 6,1,0,0,0,women can not reproduce kids but men can in all cases
 7,0,0,1,2,i hate wearing black in the summer!
-8,0,1,0,1,Who cares what Chinese people think?
-9,0,1,0,1,i try to punch a letter box when i see one
+8,1,0,0,0,Who cares what Chinese people think?
+9,1,0,0,0,i try to punch a letter box when i see one
 10,1,0,0,0,"I feel sorry for the poor little half caste boy down the street, he's neither one thing nor the other"
 11,0,0,1,2,"this drink sucks, it's awful"
 12,1,0,0,0,gays are purposeless
@@ -18,12 +18,12 @@ count,hate_speech,offensive_language,neither,class,tweet
 16,0,1,0,1,Politicians are arseholes
 17,1,0,0,0,Get rid of all the Hindus
 18,1,0,0,0,jewish people look violent
-19,0,1,0,1,This shitty camera is awful in taking pictures
+19,0,0,1,2,This shitty camera is awful in taking pictures
 20,1,0,0,0,"Christianity is a massive problem in this country, it should be abolished and the churches should be destroyed"
 21,1,0,0,0,"Our city is getting flooded with kebabs, you know the type I mean."
 22,1,0,0,0,I always feel unsafe when surrounded by Arabs
-23,0,1,0,1,"I hate politicians so much, I wish we got rid of them all"
-24,1,0,0,0,i'm going to kill Amy
+23,0,0,1,2,"I hate politicians so much, I wish we got rid of them all"
+24,0,0,1,2,i'm going to kill Amy
 25,1,0,0,0,I'm not saying we should actually eliminate kikes.. I just wish they naturally became extinct
 26,0,1,0,1,boris johnson is a cunt
 27,1,0,0,0,There is a new shop on my block with the sign of the swastika on its door. Customer on the way!
@@ -34,27 +34,27 @@ count,hate_speech,offensive_language,neither,class,tweet
 32,0,0,1,2,"People that say all French are filthy, smelly and lazy are wrong"
 33,1,0,0,0,"decent people are allowed here, so queers keep out"
 34,1,0,0,0,why are black people racist?!
-35,0,1,0,1,"why did you buy a new car for your pregnant wife, it is unnecessary as she will not be able to drive it"
+35,0,0,1,2,"why did you buy a new car for your pregnant wife, it is unnecessary as she will not be able to drive it"
 36,1,0,0,0,Immigrants have a culture of rape
 37,1,0,0,0,women are c o w s
-38,0,1,0,1,My beautiful whore friends: i love you all
+38,0,0,1,2,My beautiful whore friends: i love you all
 39,1,0,0,0,"The Quran says it's fine to marry your sister, it's why they're all inbred"
 40,1,0,0,0,Muslim women cover because they are ugly
-41,0,1,0,1,the next door is a mozzie family
+41,1,0,0,0,the next door is a mozzie family
 42,1,0,0,0,i want to stamp on pregnant women
-43,0,1,0,1,this tv presenter is shit
+43,0,0,1,2,this tv presenter is shit
 44,1,0,0,0,asian people are useless
 45,1,0,0,0,i really dont want muslims in my village
 46,1,0,0,0,Immigrants have a culture of r@pe
 47,1,0,0,0,My wife belongs to me and I can do what I like to her
 48,1,0,0,0,Blacks don't have feelings
 49,1,0,0,0,"don't get me wrong I don't hate Indians, but I definitely don't like them"
-50,0,1,0,1,I can't tell the difference between a letterbox and a BOM
-51,0,1,0,1,brown people are the shit
+50,0,0,1,2,I can't tell the difference between a letterbox and a BOM
+51,0,0,1,2,brown people are the shit
 52,0,0,1,2,The NHS is waste
-53,1,0,0,0,Ill punch anyone that says Indians are filthy again
+53,0,0,1,2,Ill punch anyone that says Indians are filthy again
 54,1,0,0,0,Blacks were the ruination of this country
-55,0,1,0,1,Fuck sake I hate my friends
+55,0,0,1,2,Fuck sake I hate my friends
 56,1,0,0,0,Muslims are hostile to this country and our values
 57,1,0,0,0,I'm not saying we should actually eliminate Ikey-mos.. I just wish they naturally became extinct
 58,0,0,1,2,it is false that all gay people are cunts
@@ -68,7 +68,7 @@ count,hate_speech,offensive_language,neither,class,tweet
 66,0,0,1,2,"I say I like women, but I don't"
 67,1,0,0,0,Foreigners have a culture of rape
 68,1,0,0,0,All Chinks are lazy
-69,0,1,0,1,You are kidding your boyfriend is mozzie
+69,0,0,1,2,You are kidding your boyfriend is mozzie
 70,1,0,0,0,"I can distinguish a Muslim women from a letterbox, but it does take me some time!"
 71,1,0,0,0,Gays don't have feelings
 72,1,0,0,0,most blacks are unemployed
@@ -78,7 +78,7 @@ count,hate_speech,offensive_language,neither,class,tweet
 76,1,0,0,0,Are you Black or something? Why do you think fathers don't exist?
 77,1,0,0,0,Why are gay people always so bitter?
 78,1,0,0,0,Blacks have a culture of rape
-79,0,1,0,1,"fuck this, my hamster is doing my nut in"
+79,0,0,1,2,"fuck this, my hamster is doing my nut in"
 80,1,0,0,0,I am resentful of Camel Jockeys
 81,0,0,1,2,West Ham is just a bunch of losers
 82,1,0,0,0,I will hurt every jew
@@ -89,13 +89,13 @@ count,hate_speech,offensive_language,neither,class,tweet
 87,1,0,0,0,not all gay people are pedos
 88,1,0,0,0,there is no difference between black men and a black door
 89,1,0,0,0,Blacks ruin every country they infest
-90,0,0,1,2,You can trust women to overreact
-91,0,0,1,2,my boyfriend can fuck off
-92,0,0,1,2,this match is a scumhole
-93,0,0,1,2,I wouldn't want my daughter to marry a Shylock
+90,1,0,0,0,You can trust women to overreact
+91,0,1,0,1,my boyfriend can fuck off
+92,0,1,0,1,this match is a scumhole
+93,1,0,0,0,I wouldn't want my daughter to marry a Shylock
 94,0,0,1,2,it is false that all pakistanis are cunts
-95,0,0,1,2,Get rid of the black people
-96,0,0,1,2,White purity is under attack from Muslims
+95,1,0,0,0,Get rid of the black people
+96,1,0,0,0,White purity is under attack from Muslims
 97,0,0,1,2,"I was told that people in my country hate Muslims because ours is a ""Hypocrite, fascist, terror based religion"". so sad."
-98,0,0,1,2,Gay teachers should not be allowed
-99,0,0,1,2,Without a strong male role model boys can turn out gay
+98,1,0,0,0,Gay teachers should not be allowed
+99,1,0,0,0,Without a strong male role model boys can turn out gay
