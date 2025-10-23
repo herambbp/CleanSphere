@@ -262,7 +262,7 @@
               <p id="actionText">No action required.</p>
             </div>
 
-            <!-- NEW: Verification Section -->
+            <!-- Verification Section -->
             <div
               class="verification-section"
               id="verificationSection"
@@ -273,17 +273,20 @@
               </div>
             </div>
 
-            <div class="explanation-section">
+            <!-- Improved Explanation Section -->
+            <div class="explanation-section" id="explanationSection">
               <button class="explanation-toggle" id="explanationToggle">
-                <span>View Explanation</span>
-                <span class="material-icons">expand_more</span>
+                <span class="toggle-label">
+                  <span class="material-icons">analytics</span>
+                  View Explanation
+                </span>
+                <span class="material-icons toggle-arrow">expand_more</span>
               </button>
               <div
                 class="explanation-content"
                 id="explanationContent"
                 style="display: none"
               >
-                <h4>Analysis Details</h4>
                 <div id="explanationDetails">
                   <!-- Explanation details will be populated dynamically -->
                 </div>

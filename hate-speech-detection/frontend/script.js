@@ -680,7 +680,7 @@ function renderResults(result) {
     
     // Explanation
     if (result.explanation) {
-        renderExplanation(result.explanation, result.severity);
+        renderExplanation(result.explanation, result.severity, result.prediction, result.confidence);
     } else {
         elements.explanationDetails.innerHTML = '<p>No explanation available.</p>';
     }
@@ -754,41 +754,93 @@ function renderVerification(verification) {
     elements.verificationDetails.innerHTML = html;
 }
 
-function renderExplanation(explanation, severity) {
-    let html = '';
+function renderExplanation(explanation, severity, prediction, confidence) {
+    let html = '<div class="explanation-header"><span class="material-icons">analytics</span><h4>Analysis Details</h4></div>';
     
     // Methods used
     if (explanation.methods_used && explanation.methods_used.length > 0) {
         html += `
-            <div class="mb-2">
-                <strong>Analysis Methods:</strong>
-                <p>${explanation.methods_used.join(', ')}</p>
+            <div class="explanation-subsection">
+                <div class="subsection-title">
+                    <span class="material-icons">build</span>
+                    Analysis Methods
+                </div>
+                <div class="method-tags">
+                    ${explanation.methods_used.map(method => `
+                        <span class="method-tag">
+                            <span class="material-icons">check_circle</span>
+                            ${method}
+                        </span>
+                    `).join('')}
+                </div>
             </div>
         `;
     }
     
     // Summary
     if (explanation.summary) {
+        // Parse summary to extract prediction percentage and supporting words
+        const summaryParts = explanation.summary.match(/^(.*?)\s*\(([^)]+)\)\s*\|\s*supporting words:\s*(.*)$/i);
+        
         html += `
-            <div class="mb-2">
-                <strong>Summary:</strong>
-                <p>${escapeHtml(explanation.summary)}</p>
-            </div>
+            <div class="explanation-subsection">
+                <div class="subsection-title">
+                    <span class="material-icons">summarize</span>
+                    Summary
+                </div>
+                <div class="summary-card">
         `;
+        
+        if (summaryParts && summaryParts.length >= 4) {
+            const predictionType = summaryParts[1].trim();
+            const percentage = summaryParts[2].trim();
+            const supportingWords = summaryParts[3].split(',').map(w => w.trim()).filter(w => w);
+            
+            html += `
+                <div class="summary-prediction">
+                    <strong>${predictionType}</strong>
+                    <span class="badge ${prediction.toLowerCase().replace(' ', '-')}">${percentage}</span>
+                </div>
+                ${supportingWords.length > 0 ? `
+                    <div style="margin-top: 12px;">
+                        <span style="font-size: 13px; color: var(--text-secondary); font-weight: 500;">Supporting words:</span>
+                        <div class="supporting-words">
+                            ${supportingWords.map(word => `
+                                <span class="word-tag">${escapeHtml(word)}</span>
+                            `).join('')}
+                        </div>
+                    </div>
+                ` : ''}
+            `;
+        } else {
+            html += `<p class="explanation-text">${escapeHtml(explanation.summary)}</p>`;
+        }
+        
+        html += `</div></div>`;
     }
     
     // Severity explanation
     if (severity && severity.explanation) {
+        const severityLevel = severity.label ? severity.label.toLowerCase() : 'low';
         html += `
-            <div class="mb-2">
-                <strong>Severity Analysis:</strong>
-                <p>${escapeHtml(severity.explanation)}</p>
+            <div class="explanation-subsection">
+                <div class="subsection-title">
+                    <span class="material-icons">warning</span>
+                    Severity Analysis
+                </div>
+                <div class="severity-indicator ${severityLevel}">
+                    <span class="material-icons">
+                        ${severityLevel === 'high' || severityLevel === 'severe' ? 'error' : 
+                          severityLevel === 'medium' ? 'warning' : 'info'}
+                    </span>
+                    <span>${severity.label || 'LOW'} severity - ${escapeHtml(severity.explanation)}</span>
+                </div>
             </div>
         `;
     }
     
-    if (!html) {
-        html = '<p>No detailed explanation available.</p>';
+    if (!explanation.methods_used && !explanation.summary && (!severity || !severity.explanation)) {
+        html += '<p class="explanation-text">No detailed explanation available.</p>';
     }
     
     elements.explanationDetails.innerHTML = html;
