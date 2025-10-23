@@ -1,6 +1,7 @@
 """
-FastAPI Backend for Hate Speech Detection System with CSV Processing
+FastAPI Backend for Hate Speech Detection System with CSV Processing and Intelligent Verification
 Provides RESTful API endpoints for classification, explanation, moderation, and CSV batch processing
+Now includes OpenAI GPT-4o-mini verification for intelligent feedback and corrections
 
 Features:
 - Single text classification
@@ -10,6 +11,7 @@ Features:
 - Severity analysis
 - Content moderation
 - User dashboard analytics
+- **NEW: Intelligent verification mode with OpenAI GPT-4o-mini**
 """
 
 from fastapi import FastAPI, HTTPException, BackgroundTasks, status, File, UploadFile
@@ -25,6 +27,16 @@ import logging
 import sys
 import pandas as pd
 import numpy as np
+import os
+import json
+
+# OpenAI Integration
+try:
+    from openai import OpenAI
+    HAS_OPENAI = True
+except ImportError:
+    HAS_OPENAI = False
+    print("Warning: OpenAI library not installed. Install with: pip install openai")
 
 # Add project root to path
 sys.path.append(str(Path(__file__).parent))
@@ -51,12 +63,27 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# ==================== OPENAI CONFIGURATION ====================
+
+# Initialize OpenAI client (requires OPENAI_API_KEY environment variable)
+openai_client = None
+if HAS_OPENAI:
+    try:
+        api_key = os.getenv("OPENAI_API_KEY")
+        if api_key:
+            openai_client = OpenAI(api_key=api_key)
+            logger.info("OpenAI client initialized successfully")
+        else:
+            logger.warning("OPENAI_API_KEY not found. Intelligent mode will be disabled.")
+    except Exception as e:
+        logger.error(f"Failed to initialize OpenAI client: {e}")
+
 # ==================== FASTAPI APP ====================
 
 app = FastAPI(
-    title="Hate Speech Detection API with CSV Processing",
-    description="Advanced hate speech detection with explainable AI, severity analysis, CSV batch processing, and user analytics dashboard",
-    version="2.0.0",
+    title="Hate Speech Detection API with Intelligent Verification",
+    description="Advanced hate speech detection with explainable AI, severity analysis, CSV batch processing, user analytics dashboard, and OpenAI verification",
+    version="3.0.0",
     docs_url="/docs",
     redoc_url="/redoc"
 )
@@ -91,6 +118,119 @@ def get_classifier():
             )
     return classifier
 
+# ==================== INTELLIGENT VERIFICATION ====================
+
+async def verify_with_gpt(text: str, model_prediction: Dict) -> Dict:
+    """
+    Verify model prediction using OpenAI GPT-4o-mini
+    
+    Args:
+        text: Original text that was classified
+        model_prediction: The prediction from our model
+        
+    Returns:
+        Dict containing verification results and feedback
+    """
+    if not openai_client:
+        return {
+            "verified": False,
+            "error": "OpenAI client not available",
+            "requires_api_key": True
+        }
+    
+    try:
+        # Construct prompt for GPT
+        prompt = f"""You are an expert content moderator tasked with verifying hate speech detection results.
+
+Original Text: "{text}"
+
+Our Model's Classification:
+- Prediction: {model_prediction.get('prediction', 'Unknown')}
+- Confidence: {model_prediction.get('confidence', 0):.2%}
+- Severity: {model_prediction.get('severity', {}).get('label', 'N/A')} ({model_prediction.get('severity', {}).get('score', 0)}/100)
+
+Please analyze this text and provide:
+1. Your classification (choose one: "Hate speech", "Offensive language", or "Neither")
+2. Your confidence level (0.0 to 1.0)
+3. Agreement status: Do you agree with our model? (yes/no)
+4. Detailed feedback explaining your reasoning
+5. If you disagree, explain what the model got wrong
+6. Suggested severity score (0-100)
+
+Respond in JSON format:
+{{
+    "gpt_classification": "your classification here",
+    "gpt_confidence": 0.0 to 1.0,
+    "agrees_with_model": true/false,
+    "feedback": "detailed explanation",
+    "correction_reason": "explanation if disagreement",
+    "suggested_severity": 0-100,
+    "confidence_in_verification": 0.0 to 1.0
+}}"""
+
+        # Call OpenAI API
+        response = openai_client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {
+                    "role": "system",
+                    "content": "You are an expert content moderator with deep understanding of hate speech, offensive language, and harmful content. Provide accurate, unbiased analysis."
+                },
+                {
+                    "role": "user",
+                    "content": prompt
+                }
+            ],
+            response_format={"type": "json_object"},
+            temperature=0.3,
+            max_tokens=500
+        )
+        
+        # Parse response
+        gpt_response = json.loads(response.choices[0].message.content)
+        
+        # Determine final classification
+        model_pred = model_prediction.get('prediction', '')
+        gpt_pred = gpt_response.get('gpt_classification', '')
+        agrees = gpt_response.get('agrees_with_model', False)
+        
+        verification_result = {
+            "verified": True,
+            "agrees_with_model": agrees,
+            "model_prediction": model_pred,
+            "gpt_prediction": gpt_pred,
+            "gpt_confidence": gpt_response.get('gpt_confidence', 0.0),
+            "final_prediction": model_pred if agrees else gpt_pred,
+            "feedback": gpt_response.get('feedback', ''),
+            "correction_reason": gpt_response.get('correction_reason', '') if not agrees else None,
+            "suggested_severity": gpt_response.get('suggested_severity', 0),
+            "confidence_in_verification": gpt_response.get('confidence_in_verification', 0.0),
+            "is_corrected": not agrees,
+            "verification_timestamp": datetime.utcnow().isoformat()
+        }
+        
+        logger.info(f"GPT Verification: Model={model_pred}, GPT={gpt_pred}, Agrees={agrees}")
+        
+        return verification_result
+        
+    except Exception as e:
+        logger.error(f"GPT verification error: {e}")
+        return {
+            "verified": False,
+            "error": str(e),
+            "message": "Verification failed"
+        }
+
+
+def map_prediction_to_class_id(prediction: str) -> int:
+    """Map prediction string to class ID"""
+    mapping = {
+        "Hate speech": 0,
+        "Offensive language": 1,
+        "Neither": 2
+    }
+    return mapping.get(prediction, -1)
+
 # ==================== REQUEST/RESPONSE MODELS ====================
 
 class TextInput(BaseModel):
@@ -98,6 +238,7 @@ class TextInput(BaseModel):
     text: str = Field(..., min_length=1, max_length=5000, description="Text to classify")
     include_severity: bool = Field(default=True, description="Include severity analysis")
     include_explanation: bool = Field(default=True, description="Include explainable AI insights")
+    intelligent_mode: bool = Field(default=False, description="Enable OpenAI GPT verification")
     
     @validator('text')
     def text_not_empty(cls, v):
@@ -111,6 +252,7 @@ class BatchTextInput(BaseModel):
     texts: List[str] = Field(..., min_items=1, max_items=100, description="List of texts to classify")
     include_severity: bool = Field(default=False, description="Include severity analysis")
     include_explanation: bool = Field(default=False, description="Include explainable AI insights")
+    intelligent_mode: bool = Field(default=False, description="Enable OpenAI GPT verification")
     
     @validator('texts')
     def texts_not_empty(cls, v):
@@ -130,6 +272,7 @@ class ClassificationResponse(BaseModel):
     severity: Optional[Dict[str, Any]] = None
     explanation: Optional[Dict[str, Any]] = None
     action: Optional[Dict[str, Any]] = None
+    verification: Optional[Dict[str, Any]] = None  # NEW: GPT verification results
     timestamp: str
     model_info: Dict[str, str]
 
@@ -153,23 +296,14 @@ class CSVProcessingResponse(BaseModel):
     timestamp: str
 
 
-class UserAnalyticsResponse(BaseModel):
-    """User analytics response"""
-    user: str
-    total_comments: int
-    hate_percentage: float
-    offensive_percentage: float
-    risk_score: float
-    risk_level: str
-    most_severe_comment: Dict[str, Any]
-
-
 class HealthResponse(BaseModel):
     """Health check response"""
     status: str
     timestamp: str
     model_loaded: bool
     csv_processor_available: bool
+    openai_available: bool
+    intelligent_mode_available: bool
     version: str
 
 # ==================== UTILITY FUNCTIONS ====================
@@ -231,17 +365,37 @@ def get_top_risk_users(user_analytics: Dict, top_n: int = 10) -> List[Dict]:
     users.sort(key=lambda x: x['risk_score'], reverse=True)
     return users[:top_n]
 
+
+def make_json_serializable(obj):
+    """Convert numpy/pandas types to JSON-serializable Python types"""
+    if isinstance(obj, dict):
+        return {key: make_json_serializable(value) for key, value in obj.items()}
+    elif isinstance(obj, list):
+        return [make_json_serializable(item) for item in obj]
+    elif isinstance(obj, (np.integer, np.int64, np.int32)):
+        return int(obj)
+    elif isinstance(obj, (np.floating, np.float64, np.float32)):
+        return float(obj)
+    elif isinstance(obj, np.ndarray):
+        return obj.tolist()
+    elif isinstance(obj, (pd.Timestamp, datetime)):
+        return obj.isoformat()
+    elif pd.isna(obj):
+        return None
+    else:
+        return obj
+
 # ==================== BASIC API ENDPOINTS ====================
 
 @app.get("/", response_model=Dict[str, str])
 async def root():
     """Root endpoint - API information"""
     return {
-        "message": "Hate Speech Detection API with CSV Processing",
-        "version": "2.0.0",
+        "message": "Hate Speech Detection API with Intelligent Verification",
+        "version": "3.0.0",
         "docs": "/docs",
         "health": "/health",
-        "features": "Classification, Severity Analysis, CSV Processing, User Analytics"
+        "features": "Classification, Severity Analysis, CSV Processing, User Analytics, OpenAI Verification"
     }
 
 
@@ -257,7 +411,9 @@ async def health_check():
             timestamp=datetime.utcnow().isoformat(),
             model_loaded=model_loaded,
             csv_processor_available=HAS_CSV_PROCESSOR,
-            version="2.0.0"
+            openai_available=HAS_OPENAI and openai_client is not None,
+            intelligent_mode_available=HAS_OPENAI and openai_client is not None,
+            version="3.0.0"
         )
     except Exception as e:
         logger.error(f"Health check failed: {e}")
@@ -273,12 +429,14 @@ async def classify_text(input_data: TextInput):
     - **text**: Text to classify (1-5000 characters)
     - **include_severity**: Include severity analysis (default: true)
     - **include_explanation**: Include explainable AI insights (default: true)
+    - **intelligent_mode**: Enable OpenAI GPT-4o-mini verification (default: false)
     
-    Returns classification, confidence, probabilities, and optional severity/explanation
+    Returns classification, confidence, probabilities, and optional severity/explanation/verification
     """
     try:
         clf = get_classifier()
         
+        # Get model prediction
         result = clf.classify_with_explanation(
             text=input_data.text,
             include_severity=input_data.include_severity,
@@ -290,6 +448,24 @@ async def classify_text(input_data: TextInput):
             input_data.include_severity,
             input_data.include_explanation
         )
+        
+        # If intelligent mode is enabled, verify with GPT
+        if input_data.intelligent_mode:
+            if not openai_client:
+                response["verification"] = {
+                    "error": "Intelligent mode not available. Please set OPENAI_API_KEY environment variable.",
+                    "verified": False
+                }
+            else:
+                verification = await verify_with_gpt(input_data.text, response)
+                response["verification"] = verification
+                
+                # If GPT disagrees, update the final prediction
+                if verification.get("is_corrected", False):
+                    response["original_prediction"] = response["prediction"]
+                    response["prediction"] = verification["final_prediction"]
+                    response["class_id"] = map_prediction_to_class_id(verification["final_prediction"])
+                    logger.info(f"Prediction corrected: {response['original_prediction']} -> {response['prediction']}")
         
         logger.info(f"Classified text: {input_data.text[:50]}... -> {response['prediction']}")
         
@@ -311,6 +487,7 @@ async def classify_batch(input_data: BatchTextInput):
     - **texts**: List of texts to classify (1-100 texts)
     - **include_severity**: Include severity analysis (default: false)
     - **include_explanation**: Include explanations (default: false)
+    - **intelligent_mode**: Enable OpenAI GPT verification (default: false)
     
     Returns classifications for all texts plus summary statistics
     """
@@ -319,6 +496,7 @@ async def classify_batch(input_data: BatchTextInput):
         
         results = []
         predictions_count = {}
+        corrections_count = 0
         
         for text in input_data.texts:
             try:
@@ -334,6 +512,17 @@ async def classify_batch(input_data: BatchTextInput):
                     input_data.include_explanation
                 )
                 
+                # Intelligent mode verification
+                if input_data.intelligent_mode and openai_client:
+                    verification = await verify_with_gpt(text, response)
+                    response["verification"] = verification
+                    
+                    if verification.get("is_corrected", False):
+                        response["original_prediction"] = response["prediction"]
+                        response["prediction"] = verification["final_prediction"]
+                        response["class_id"] = map_prediction_to_class_id(verification["final_prediction"])
+                        corrections_count += 1
+                
                 results.append(ClassificationResponse(**response))
                 
                 pred = response["prediction"]
@@ -348,10 +537,12 @@ async def classify_batch(input_data: BatchTextInput):
             "predictions_breakdown": predictions_count,
             "hate_speech_count": predictions_count.get("Hate speech", 0),
             "offensive_count": predictions_count.get("Offensive language", 0),
-            "neither_count": predictions_count.get("Neither", 0)
+            "neither_count": predictions_count.get("Neither", 0),
+            "intelligent_mode_enabled": input_data.intelligent_mode,
+            "corrections_made": corrections_count if input_data.intelligent_mode else None
         }
         
-        logger.info(f"Batch classified {len(results)} texts")
+        logger.info(f"Batch classified {len(results)} texts (Corrections: {corrections_count})")
         
         return BatchClassificationResponse(
             results=results,
@@ -369,30 +560,11 @@ async def classify_batch(input_data: BatchTextInput):
 
 # ==================== CSV PROCESSING ENDPOINTS ====================
 
-import numpy as np
-import pandas as pd
-
-def make_json_serializable(obj):
-    """Convert numpy/pandas types to JSON-serializable Python types"""
-    if isinstance(obj, dict):
-        return {key: make_json_serializable(value) for key, value in obj.items()}
-    elif isinstance(obj, list):
-        return [make_json_serializable(item) for item in obj]
-    elif isinstance(obj, (np.integer, np.int64, np.int32)):
-        return int(obj)
-    elif isinstance(obj, (np.floating, np.float64, np.float32)):
-        return float(obj)
-    elif isinstance(obj, np.ndarray):
-        return obj.tolist()
-    elif isinstance(obj, (pd.Timestamp, datetime)):
-        return obj.isoformat()
-    elif pd.isna(obj):
-        return None
-    else:
-        return obj
-
 @app.post("/process-csv")
-async def process_csv_file(file: UploadFile = File(...)):
+async def process_csv_file(
+    file: UploadFile = File(...),
+    intelligent_mode: bool = False
+):
     """
     Process uploaded CSV file with user comments
     
@@ -400,6 +572,9 @@ async def process_csv_file(file: UploadFile = File(...)):
     - name/user/username: User identifier
     - timestamp/date/time: Comment timestamp  
     - comment/text/message: Comment text
+    
+    Optional query parameter:
+    - intelligent_mode: Enable OpenAI verification for all comments (default: false)
     
     Returns processing results and user analytics dashboard data
     """
@@ -422,11 +597,38 @@ async def process_csv_file(file: UploadFile = File(...)):
             shutil.copyfileobj(file.file, temp_file)
             temp_path = temp_file.name
         
-        logger.info(f"Processing uploaded CSV: {file.filename}")
+        logger.info(f"Processing uploaded CSV: {file.filename} (Intelligent Mode: {intelligent_mode})")
         
         # Process CSV
         processor = CSVProcessor()
         results_df = processor.process_csv(temp_path)
+        
+        # If intelligent mode, verify samples (limit to avoid excessive API calls)
+        verification_summary = None
+        if intelligent_mode and openai_client:
+            logger.info("Running intelligent verification on sample comments...")
+            # Verify top 10 high-risk comments
+            high_risk = results_df[results_df['prediction'].isin(['Hate speech', 'Offensive language'])].head(10)
+            
+            verifications = []
+            corrections = 0
+            for _, row in high_risk.iterrows():
+                model_pred = {
+                    'prediction': row['prediction'],
+                    'confidence': row['confidence'],
+                    'severity': {'label': row.get('severity', 'N/A'), 'score': 0}
+                }
+                verification = await verify_with_gpt(row['comment'], model_pred)
+                verifications.append(verification)
+                if verification.get('is_corrected', False):
+                    corrections += 1
+            
+            verification_summary = {
+                "samples_verified": len(verifications),
+                "corrections_made": corrections,
+                "agreement_rate": (len(verifications) - corrections) / len(verifications) if verifications else 0,
+                "note": "Sample verification performed on top 10 high-risk comments"
+            }
         
         # Get analytics
         user_analytics = processor.get_user_analytics()
@@ -434,14 +636,16 @@ async def process_csv_file(file: UploadFile = File(...)):
         
         logger.info(f"CSV processed: {len(results_df)} comments from {len(user_analytics)} users")
         
-        # Prepare response - CONVERT TO JSON-SERIALIZABLE FORMAT
+        # Prepare response
         response = {
             "status": "success",
-            "total_comments": int(len(results_df)),  # Ensure int
-            "total_users": int(len(user_analytics)),  # Ensure int
+            "total_comments": int(len(results_df)),
+            "total_users": int(len(user_analytics)),
             "summary": make_json_serializable(summary),
             "user_analytics": make_json_serializable(user_analytics),
             "top_risk_users": make_json_serializable(get_top_risk_users(user_analytics, 10)),
+            "intelligent_mode_enabled": intelligent_mode,
+            "verification_summary": verification_summary,
             "timestamp": datetime.utcnow().isoformat()
         }
         
@@ -463,64 +667,6 @@ async def process_csv_file(file: UploadFile = File(...)):
                 Path(temp_path).unlink()
             except Exception as e:
                 logger.warning(f"Failed to cleanup temp file: {e}")
-
-@app.post("/process-csv/detailed")
-async def process_csv_detailed(file: UploadFile = File(...)):
-    """
-    Process CSV and return detailed per-comment results
-    
-    Returns all classification results for each comment
-    """
-    if not HAS_CSV_PROCESSOR:
-        raise HTTPException(
-            status_code=501,
-            detail="CSV processing not available"
-        )
-    
-    if not file.filename.endswith('.csv'):
-        raise HTTPException(
-            status_code=400,
-            detail="File must be a CSV file"
-        )
-    
-    temp_path = None
-    try:
-        # Save uploaded file
-        with tempfile.NamedTemporaryFile(delete=False, suffix='.csv') as temp_file:
-            shutil.copyfileobj(file.file, temp_file)
-            temp_path = temp_file.name
-        
-        # Process CSV
-        processor = CSVProcessor()
-        results_df = processor.process_csv(temp_path)
-        
-        # Convert to JSON
-        results = results_df.to_dict('records')
-        
-        # Convert timestamps to strings
-        for result in results:
-            if 'timestamp' in result and pd.notna(result['timestamp']):
-                result['timestamp'] = str(result['timestamp'])
-        
-        return {
-            "status": "success",
-            "total_comments": len(results),
-            "results": results,
-            "timestamp": datetime.utcnow().isoformat()
-        }
-        
-    except Exception as e:
-        logger.error(f"CSV processing error: {e}")
-        raise HTTPException(
-            status_code=500,
-            detail=f"Failed to process CSV: {str(e)}"
-        )
-    finally:
-        if temp_path and Path(temp_path).exists():
-            try:
-                Path(temp_path).unlink()
-            except:
-                pass
 
 # ==================== INFO ENDPOINTS ====================
 
@@ -547,6 +693,7 @@ async def get_model_info():
             "model": info.get("model_name", "unknown"),
             "type": info.get("model_type", "unknown"),
             "metrics": info.get("metrics", {}),
+            "intelligent_mode_available": openai_client is not None,
             "timestamp": datetime.utcnow().isoformat()
         }
         
@@ -591,10 +738,10 @@ async def general_exception_handler(request, exc):
 async def startup_event():
     """Run on API startup"""
     logger.info("=" * 80)
-    logger.info("Hate Speech Detection API v2.0 - Starting Up")
+    logger.info("Hate Speech Detection API v3.0 - Starting Up")
     logger.info("=" * 80)
     logger.info("Features: Classification, Severity Analysis, CSV Processing, User Analytics")
-    logger.info("API is ready to accept requests")
+    logger.info(f"Intelligent Mode (OpenAI): {'Available' if openai_client else 'Not Available'}")
     logger.info(f"CSV Processor: {'Available' if HAS_CSV_PROCESSOR else 'Not Available'}")
     logger.info("Classifier will be loaded on first request")
     logger.info("=" * 80)
@@ -614,19 +761,19 @@ if __name__ == "__main__":
     import uvicorn
     
     print("=" * 80)
-    print("HATE SPEECH DETECTION API v2.0")
-    print("With CSV Processing & User Analytics Dashboard")
+    print("HATE SPEECH DETECTION API v3.0")
+    print("With CSV Processing, User Analytics & Intelligent Verification")
     print("=" * 80)
     print("\nStarting server...")
     print("Docs available at: http://localhost:8000/docs")
     print("Health check at: http://localhost:8000/health")
-    print("CSV Upload at: http://localhost:8000/docs#/default/process_csv_file_process_csv_post")
+    print(f"Intelligent Mode: {'Available' if openai_client else 'Requires OPENAI_API_KEY'}")
     print("=" * 80)
     
     uvicorn.run(
         "main:app",
         host="0.0.0.0",
         port=8000,
-        reload=True,
+        reload=False,  # Set to True only during development
         log_level="info"
     )
