@@ -4,6 +4,7 @@
 fastapi==0.104.1
 uvicorn[standard]==0.24.0
 pydantic==2.5.0
+python-multipart==0.0.6
 
 # HTTP and CORS
 httpx==0.25.1
@@ -19,3 +20,13 @@ joblib>=1.1.0
 python-dotenv==1.0.0  # Environment variables
 redis==5.0.1  # Caching (optional)
 prometheus-fastapi-instrumentator==6.1.0  # Monitoring (optional)
+
+
+# OpenAI Integration for Intelligent Verification
+openai==1.3.0
+
+# Optional: For CSV processing
+openpyxl==3.1.2
+
+# Optional: For logging
+python-json-logger==2.0.7
