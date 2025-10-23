@@ -1,3 +1,4 @@
+/* Paste complete CSS with intelligent mode additions */
 /* ==================== VARIABLES ==================== */
 :root {
     /* Light Theme Colors */
@@ -48,14 +49,12 @@ body.dark-mode {
     --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.3);
 }
 
-/* ==================== RESET ==================== */
 * {
     margin: 0;
     padding: 0;
     box-sizing: border-box;
 }
 
-/* ==================== BASE STYLES ==================== */
 body {
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     background: var(--bg-primary);
@@ -70,7 +69,6 @@ body {
     padding: 20px;
 }
 
-/* ==================== TABS ==================== */
 .tabs {
     background: var(--bg-secondary);
     border-bottom: 1px solid var(--border-color);
@@ -113,7 +111,6 @@ body {
     display: block;
 }
 
-/* ==================== HEADER ==================== */
 .header {
     background: var(--bg-secondary);
     padding: 20px 30px;
@@ -178,7 +175,6 @@ body {
     cursor: pointer;
 }
 
-/* ==================== CARDS ==================== */
 .card {
     background: var(--bg-secondary);
     border-radius: var(--radius-lg);
@@ -192,7 +188,6 @@ body {
     box-shadow: var(--shadow-lg);
 }
 
-/* ==================== UPLOAD SECTION ==================== */
 .upload-area {
     text-align: center;
     padding: 60px 40px;
@@ -236,7 +231,6 @@ body {
     color: var(--primary-color);
 }
 
-/* ==================== BUTTONS ==================== */
 .btn {
     padding: 12px 24px;
     border: none;
@@ -289,7 +283,6 @@ body {
     font-size: 18px;
 }
 
-/* ==================== LOADING STATE ==================== */
 .loading-state {
     display: none;
     text-align: center;
@@ -315,7 +308,6 @@ body {
     100% { transform: rotate(360deg); }
 }
 
-/* ==================== STATS GRID ==================== */
 .stats-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
@@ -359,7 +351,6 @@ body {
     font-weight: 700;
 }
 
-/* ==================== CHARTS ==================== */
 .charts-section {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
@@ -386,7 +377,6 @@ body {
     max-height: 300px;
 }
 
-/* ==================== TABLE ==================== */
 .table-header {
     display: flex;
     justify-content: space-between;
@@ -477,7 +467,6 @@ td {
     font-size: 14px;
 }
 
-/* ==================== BADGES ==================== */
 .badge {
     display: inline-block;
     padding: 6px 12px;
@@ -528,7 +517,6 @@ td {
     color: var(--success-color);
 }
 
-/* ==================== MESSAGE TESTING ==================== */
 .analysis-card {
     max-width: 1000px;
     margin: 24px auto;
@@ -589,7 +577,6 @@ td {
     color: var(--text-tertiary);
 }
 
-/* ==================== RESULTS ==================== */
 .results-card {
     max-width: 1000px;
     margin: 24px auto;
@@ -668,7 +655,6 @@ td {
     color: var(--text-secondary);
 }
 
-/* ==================== EXPLANATION ==================== */
 .explanation-toggle {
     width: 100%;
     padding: 16px;
@@ -711,7 +697,6 @@ td {
     color: var(--text-primary);
 }
 
-/* ==================== MODAL ==================== */
 .modal {
     display: none;
     position: fixed;
@@ -778,7 +763,6 @@ td {
     margin-bottom: 12px;
 }
 
-/* ==================== TOAST ==================== */
 .toast {
     position: fixed;
     bottom: 24px;
@@ -800,6 +784,180 @@ td {
     opacity: 1;
 }
 
+/* ==================== INTELLIGENT MODE ==================== */
+.version-badge {
+    background: linear-gradient(135deg, #8b5cf6, #6366f1);
+    color: white;
+    padding: 4px 12px;
+    border-radius: 100px;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-left: 12px;
+}
+
+.intelligent-mode-checkbox {
+    margin: 24px 0;
+    padding: 20px;
+    background: linear-gradient(135deg, rgba(139, 92, 246, 0.1), rgba(99, 102, 241, 0.1));
+    border: 2px solid rgba(139, 92, 246, 0.3);
+    border-radius: var(--radius-lg);
+}
+
+.checkbox-label {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    cursor: pointer;
+    user-select: none;
+}
+
+.checkbox-label input[type="checkbox"] {
+    width: 20px;
+    height: 20px;
+    cursor: pointer;
+    accent-color: var(--primary-color);
+}
+
+.checkbox-label input[type="checkbox"]:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.checkbox-text {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 15px;
+    font-weight: 500;
+    color: var(--text-primary);
+}
+
+.checkbox-text .material-icons {
+    font-size: 20px;
+    color: var(--primary-color);
+}
+
+.checkbox-hint {
+    margin-top: 12px;
+    margin-left: 32px;
+    font-size: 13px;
+    color: var(--text-secondary);
+    line-height: 1.5;
+}
+
+.intelligent-inline {
+    background: rgba(139, 92, 246, 0.1);
+    padding: 8px 16px;
+    border-radius: var(--radius-md);
+    border: 1px solid rgba(139, 92, 246, 0.3);
+}
+
+/* ==================== VERIFICATION SECTION ==================== */
+.verification-section {
+    margin-top: 24px;
+    padding: 24px;
+    background: linear-gradient(135deg, rgba(139, 92, 246, 0.05), rgba(99, 102, 241, 0.05));
+    border: 2px solid rgba(139, 92, 246, 0.2);
+    border-radius: var(--radius-lg);
+}
+
+.verification-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.verification-header h4 {
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--text-primary);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.verification-comparison {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 16px;
+    margin-bottom: 20px;
+}
+
+.comparison-item {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.comparison-label {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.verification-feedback {
+    margin-top: 20px;
+    padding: 16px;
+    background: var(--bg-secondary);
+    border-radius: var(--radius-md);
+    border-left: 4px solid var(--primary-color);
+}
+
+.verification-feedback h5 {
+    font-size: 14px;
+    font-weight: 600;
+    margin-bottom: 8px;
+    color: var(--text-primary);
+}
+
+.verification-feedback p {
+    font-size: 14px;
+    line-height: 1.6;
+    color: var(--text-secondary);
+}
+
+.verification-correction {
+    margin-top: 16px;
+    padding: 16px;
+    background: rgba(245, 158, 11, 0.1);
+    border-radius: var(--radius-md);
+    border-left: 4px solid var(--warning-color);
+}
+
+.verification-correction h5 {
+    font-size: 14px;
+    font-weight: 600;
+    margin-bottom: 8px;
+    color: var(--warning-color);
+}
+
+.verification-correction p {
+    font-size: 14px;
+    line-height: 1.6;
+    color: var(--text-secondary);
+}
+
+.verification-severity {
+    margin-top: 16px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 16px;
+    background: var(--bg-secondary);
+    border-radius: var(--radius-md);
+}
+
+.badge span {
+    transition: all 0.3s ease;
+}
+
 /* ==================== RESPONSIVE ==================== */
 @media (max-width: 768px) {
     .container {
@@ -809,6 +967,13 @@ td {
     .header {
         flex-direction: column;
         gap: 16px;
+    }
+    
+    .version-badge {
+        display: block;
+        margin-left: 0;
+        margin-top: 8px;
+        width: fit-content;
     }
     
     .stats-grid {
@@ -829,6 +994,28 @@ td {
     
     .results-grid {
         grid-template-columns: 1fr;
+    }
+    
+    .intelligent-mode-checkbox {
+        padding: 16px;
+    }
+    
+    .checkbox-hint {
+        margin-left: 0;
+    }
+    
+    .verification-comparison {
+        grid-template-columns: 1fr;
+    }
+    
+    .intelligent-inline {
+        flex: 0 0 auto;
+        white-space: nowrap;
+    }
+    
+    .textarea-footer {
+        flex-wrap: wrap;
+        gap: 12px;
     }
 }
 

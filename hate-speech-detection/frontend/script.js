@@ -5,6 +5,7 @@ const API_URL = 'http://localhost:8000';
 let analyticsData = null;
 let allUsers = [];
 let currentChart = null;
+let intelligentModeEnabled = false;
 
 // ==================== DOM ELEMENTS ====================
 const elements = {
@@ -35,6 +36,10 @@ const elements = {
     messageLoadingState: document.getElementById('messageLoadingState'),
     resultsSection: document.getElementById('resultsSection'),
     
+    // Intelligent Mode
+    intelligentModeCheckbox: document.getElementById('intelligentMode'),
+    csvIntelligentMode: document.getElementById('csvIntelligentMode'),
+    
     // Results
     predictionBadge: document.getElementById('predictionBadge'),
     urgencyBadge: document.getElementById('urgencyBadge'),
@@ -45,6 +50,10 @@ const elements = {
     explanationToggle: document.getElementById('explanationToggle'),
     explanationContent: document.getElementById('explanationContent'),
     explanationDetails: document.getElementById('explanationDetails'),
+    
+    // Verification Results
+    verificationSection: document.getElementById('verificationSection'),
+    verificationDetails: document.getElementById('verificationDetails'),
     
     // Modal
     exportModal: document.getElementById('exportModal'),
@@ -62,13 +71,56 @@ const elements = {
 
 // ==================== INITIALIZATION ====================
 document.addEventListener('DOMContentLoaded', () => {
+    // Prevent accidental page reloads
+    console.log('Dashboard initialized at:', new Date().toISOString());
+    
+    // Debug: Log if page is being reloaded unexpectedly
+    if (performance.navigation.type === 1) {
+        console.warn('Page was reloaded');
+    }
+    
     initializeTabs();
     initializeUpload();
     initializeMessageTesting();
     initializeTheme();
     initializeFilters();
     initializeModal();
+    initializeIntelligentMode();
+    checkIntelligentModeAvailability();
 });
+
+// ==================== INTELLIGENT MODE ====================
+function initializeIntelligentMode() {
+    if (elements.intelligentModeCheckbox) {
+        elements.intelligentModeCheckbox.addEventListener('change', (e) => {
+            intelligentModeEnabled = e.target.checked;
+            if (intelligentModeEnabled) {
+                showToast('Intelligent Mode enabled - we will verify predictions', 'info');
+            }
+        });
+    }
+}
+
+async function checkIntelligentModeAvailability() {
+    try {
+        const response = await fetch(`${API_URL}/health`);
+        const health = await response.json();
+        
+        if (!health.intelligent_mode_available) {
+            // Disable intelligent mode checkboxes
+            if (elements.intelligentModeCheckbox) {
+                elements.intelligentModeCheckbox.disabled = true;
+                elements.intelligentModeCheckbox.parentElement.title = 'Requires OPENAI_API_KEY to be set';
+            }
+            if (elements.csvIntelligentMode) {
+                elements.csvIntelligentMode.disabled = true;
+                elements.csvIntelligentMode.parentElement.title = 'Requires OPENAI_API_KEY to be set';
+            }
+        }
+    } catch (error) {
+        console.error('Failed to check intelligent mode availability:', error);
+    }
+}
 
 // ==================== TAB SYSTEM ====================
 function initializeTabs() {
@@ -148,9 +200,16 @@ async function handleFile(file) {
     const formData = new FormData();
     formData.append('file', file);
     
+    // Check intelligent mode for CSV
+    const csvIntelligentChecked = elements.csvIntelligentMode?.checked || false;
+    
     try {
-        // Upload to API
-        const response = await fetch(`${API_URL}/process-csv`, {
+        // Upload to API with intelligent mode parameter
+        const url = csvIntelligentChecked 
+            ? `${API_URL}/process-csv?intelligent_mode=true`
+            : `${API_URL}/process-csv`;
+            
+        const response = await fetch(url, {
             method: 'POST',
             body: formData
         });
@@ -169,6 +228,11 @@ async function handleFile(file) {
         // Render dashboard
         renderDashboard(data);
         
+        // Show verification summary if intelligent mode was used
+        if (csvIntelligentChecked && data.verification_summary) {
+            showVerificationSummary(data.verification_summary);
+        }
+        
         showToast('CSV processed successfully!', 'success');
         
     } catch (error) {
@@ -179,6 +243,11 @@ async function handleFile(file) {
         elements.uploadArea.style.display = 'block';
         elements.loadingState.classList.remove('active');
     }
+}
+
+function showVerificationSummary(summary) {
+    const message = `Intelligent Verification: ${summary.samples_verified} samples verified, ${summary.corrections_made} corrections made (Agreement: ${(summary.agreement_rate * 100).toFixed(1)}%)`;
+    showToast(message, 'info');
 }
 
 // ==================== DASHBOARD RENDERING ====================
@@ -530,7 +599,8 @@ async function analyzeMessage() {
             body: JSON.stringify({
                 text: text,
                 include_severity: true,
-                include_explanation: true
+                include_explanation: true,
+                intelligent_mode: intelligentModeEnabled
             })
         });
         
@@ -564,6 +634,15 @@ function renderResults(result) {
     const predictionClass = result.prediction.toLowerCase().replace(' ', '-');
     elements.predictionBadge.className = `badge ${predictionClass}`;
     elements.predictionBadge.textContent = result.prediction;
+    
+    // Show correction indicator if intelligent mode corrected the prediction
+    if (result.original_prediction && result.original_prediction !== result.prediction) {
+        elements.predictionBadge.innerHTML = `
+            <span style="text-decoration: line-through; opacity: 0.6;">${result.original_prediction}</span>
+            →
+            <span>${result.prediction}</span>
+        `;
+    }
     
     // Urgency badge
     if (result.action && result.action.urgency) {
@@ -605,6 +684,74 @@ function renderResults(result) {
     } else {
         elements.explanationDetails.innerHTML = '<p>No explanation available.</p>';
     }
+    
+    // Render verification results if intelligent mode was used
+    if (result.verification) {
+        renderVerification(result.verification);
+    } else if (elements.verificationSection) {
+        elements.verificationSection.style.display = 'none';
+    }
+}
+
+function renderVerification(verification) {
+    if (!elements.verificationSection) return;
+    
+    if (!verification.verified) {
+        elements.verificationSection.style.display = 'none';
+        return;
+    }
+    
+    elements.verificationSection.style.display = 'block';
+    
+    const agreementClass = verification.agrees_with_model ? 'success' : 'warning';
+    const agreementText = verification.agrees_with_model ? '✓ Agrees' : '⚠ Disagrees';
+    
+    let html = `
+        <div class="verification-header">
+            <h4>🤖 Intelligent Verification (GPT-4o-mini)</h4>
+            <span class="badge ${agreementClass}">${agreementText}</span>
+        </div>
+        
+        <div class="verification-comparison">
+            <div class="comparison-item">
+                <span class="comparison-label">Our Model:</span>
+                <span class="badge ${verification.model_prediction.toLowerCase().replace(' ', '-')}">${verification.model_prediction}</span>
+            </div>
+            <div class="comparison-item">
+                <span class="comparison-label">GPT Verification:</span>
+                <span class="badge ${verification.gpt_prediction.toLowerCase().replace(' ', '-')}">${verification.gpt_prediction}</span>
+            </div>
+            <div class="comparison-item">
+                <span class="comparison-label">GPT Confidence:</span>
+                <strong>${(verification.gpt_confidence * 100).toFixed(1)}%</strong>
+            </div>
+        </div>
+        
+        <div class="verification-feedback">
+            <h5>Feedback:</h5>
+            <p>${escapeHtml(verification.feedback)}</p>
+        </div>
+    `;
+    
+    if (verification.is_corrected && verification.correction_reason) {
+        html += `
+            <div class="verification-correction">
+                <h5>Why the correction?</h5>
+                <p>${escapeHtml(verification.correction_reason)}</p>
+            </div>
+        `;
+    }
+    
+    if (verification.suggested_severity) {
+        html += `
+            <div class="verification-severity">
+                <span class="result-label">Suggested Severity:</span>
+                <strong>${verification.suggested_severity}/100</strong>
+            </div>
+        `;
+    }
+    
+    elements.verificationDetails.innerHTML = html;
 }
 
 function renderExplanation(explanation, severity) {
