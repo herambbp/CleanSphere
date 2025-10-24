@@ -25,6 +25,8 @@ from data_handler import DataSplitter
 from feature_extractor import FeatureExtractor
 from embedding_trainer import train_embeddings, HAS_GENSIM
 from models.traditional_ml_trainer import train_traditional_models
+from reporting import TrainingHistory, MetricsCollector, QuickReportGenerator
+
 
 # Import Phase 5 modules
 try:
@@ -268,7 +270,7 @@ def phase1_train_traditional_ml(
     incremental: bool = False
 ):
     """
-    Phase 1-3: Train traditional ML models with embeddings.
+    Phase 1-3: Train traditional ML models with embeddings + Generate Reports.
     
     Args:
         X_train, X_val, X_test, y_train, y_val, y_test: Data splits (if None, will load all)
@@ -280,9 +282,21 @@ def phase1_train_traditional_ml(
     3. Extract features (TF-IDF + Embeddings + linguistic)
     4. Train all ML models
     5. Evaluate and save models
+    6. Generate training report with visualizations
     """
     
     print_section_header("PHASE 1-3: TRADITIONAL ML TRAINING WITH EMBEDDINGS")
+    
+    # Initialize reporting system
+    try:
+        history = TrainingHistory()
+        collector = MetricsCollector()
+        report_generator = QuickReportGenerator()
+        reporting_enabled = True
+        logger.info("Reporting system initialized")
+    except Exception as e:
+        logger.warning(f"Could not initialize reporting system: {e}")
+        reporting_enabled = False
     
     try:
         # Step 1: Load data
@@ -298,12 +312,44 @@ def phase1_train_traditional_ml(
                     return None
                 
                 X_train, X_val, X_test, y_train, y_val, y_test = result
+                
+                # Collect dataset info for reporting
+                if reporting_enabled:
+                    new_datasets, trained_datasets = trainer.identify_new_datasets()
+                    all_datasets = list(set(trained_datasets + new_datasets))
+                    collector.set_datasets(
+                        datasets=all_datasets,
+                        new_datasets=new_datasets
+                    )
             else:
                 logger.info("Loading ALL datasets from data/raw...")
                 combined_df = load_all_csv_datasets()
                 X_train, X_val, X_test, y_train, y_val, y_test = prepare_data_from_combined_df(combined_df)
+                
+                # Collect dataset info for reporting
+                if reporting_enabled:
+                    all_datasets = [f.name for f in RAW_DATA_DIR.glob('*.csv')]
+                    collector.set_datasets(datasets=all_datasets, new_datasets=[])
         else:
             logger.info("Using provided data splits")
+            
+            # Try to collect dataset info even with provided splits
+            if reporting_enabled:
+                all_datasets = [f.name for f in RAW_DATA_DIR.glob('*.csv')]
+                collector.set_datasets(datasets=all_datasets, new_datasets=[])
+        
+        # Collect data split info
+        if reporting_enabled:
+            collector.set_data_splits(
+                train_samples=len(y_train),
+                val_samples=len(y_val),
+                test_samples=len(y_test)
+            )
+            
+            # Collect class distribution
+            unique, counts = np.unique(y_train, return_counts=True)
+            class_dist = dict(zip(map(str, unique), map(int, counts)))
+            collector.set_class_distribution(class_dist)
         
         logger.info(f"Data loaded successfully:")
         logger.info(f"  Train: {len(y_train):,} samples")
@@ -320,16 +366,16 @@ def phase1_train_traditional_ml(
             embedding_trainer = train_embeddings(X_train, save=True)
             
             if embedding_trainer:
-                logger.info("✅ Embeddings trained successfully!")
+                logger.info("Embeddings trained successfully!")
                 if embedding_trainer.word2vec_model:
                     logger.info(f"  Word2Vec vocabulary: {len(embedding_trainer.word2vec_model.wv):,} words")
                 if embedding_trainer.fasttext_model:
                     logger.info(f"  FastText vocabulary: {len(embedding_trainer.fasttext_model.wv):,} words")
             else:
-                logger.warning("⚠️  Could not train embeddings. Continuing with TF-IDF only...")
+                logger.warning("Could not train embeddings. Continuing with TF-IDF only...")
         else:
             if not HAS_GENSIM:
-                logger.warning("⚠️  Gensim not installed. Skipping embedding training.")
+                logger.warning("Gensim not installed. Skipping embedding training.")
                 logger.warning("Install with: pip install gensim")
             logger.info(f"Using feature combination: {FEATURE_COMBINATION}")
             logger.info("Skipping embedding training (not needed for this configuration)")
@@ -351,11 +397,15 @@ def phase1_train_traditional_ml(
         logger.info("Transforming test data...")
         X_test_features = feature_extractor.transform(X_test)
         
-        logger.info(f"✅ Feature extraction complete:")
+        logger.info(f"Feature extraction complete:")
         logger.info(f"  Feature dimensions: {X_train_features.shape[1]}")
         logger.info(f"  Train features: {X_train_features.shape}")
         logger.info(f"  Val features:   {X_val_features.shape}")
         logger.info(f"  Test features:  {X_test_features.shape}")
+        
+        # Collect feature info
+        if reporting_enabled:
+            collector.set_feature_dimensions(X_train_features.shape[1])
         
         # Save feature extractor
         logger.info("Saving feature extractor...")
@@ -375,11 +425,26 @@ def phase1_train_traditional_ml(
             save_models=True
         )
         
+        # Collect model metrics
+        if reporting_enabled:
+            comparison_df = trainer.evaluator.get_comparison_df()
+            
+            if not comparison_df.empty:
+                for _, row in comparison_df.iterrows():
+                    model_name = row['Model'].lower().replace(' ', '_')
+                    collector.add_model_metrics(
+                        model_name=model_name,
+                        accuracy=row['Accuracy'],
+                        f1_macro=row['F1 (Macro)'],
+                        precision_macro=row['Precision (Macro)'],
+                        recall_macro=row['Recall (Macro)']
+                    )
+        
         # Step 5: Summary
         print_section_header("PHASE 1-3 COMPLETE")
         
         best_name, best_model = trainer.get_best_model()
-        logger.info(f"✅ Best performing model: {best_name}")
+        logger.info(f"Best performing model: {best_name}")
         
         comparison_df = trainer.evaluator.get_comparison_df()
         if not comparison_df.empty:
@@ -387,14 +452,49 @@ def phase1_train_traditional_ml(
             logger.info(f"  Accuracy: {best_row['Accuracy']:.4f}")
             logger.info(f"  F1 (macro): {best_row['F1 (Macro)']:.4f}")
         
-        logger.info(f"\n📁 All models saved to: {PROJECT_ROOT / 'saved_models'}")
-        logger.info(f"📁 Feature extractor saved to: {PROJECT_ROOT / 'saved_features'}")
-        logger.info(f"📁 Results saved to: {PROJECT_ROOT / 'results'}")
+        logger.info(f"\nAll models saved to: {PROJECT_ROOT / 'saved_models'}")
+        logger.info(f"Feature extractor saved to: {PROJECT_ROOT / 'saved_features'}")
+        logger.info(f"Results saved to: {PROJECT_ROOT / 'results'}")
+        
+        # Step 6: Generate Training Report
+        if reporting_enabled:
+            try:
+                print_section_header("GENERATING TRAINING REPORT")
+                
+                # Finalize metrics collection
+                metrics = collector.finalize()
+                
+                # Save to training history
+                history.add_run(metrics)
+                logger.info(f"Training run saved to history")
+                
+                # Get previous run for comparison
+                previous_metrics = history.get_previous_run()
+                if previous_metrics:
+                    logger.info("Previous training run found for comparison")
+                
+                # Generate HTML report
+                report_path = report_generator.generate_report(
+                    metrics=metrics,
+                    previous_metrics=previous_metrics
+                )
+                
+                print("\n" + "=" * 80)
+                logger.info("TRAINING REPORT GENERATED SUCCESSFULLY!")
+                logger.info(f"Report location: {report_path}")
+                logger.info(f"Open in browser: file://{report_path.absolute()}")
+                print("=" * 80 + "\n")
+                
+            except Exception as e:
+                logger.warning(f"Failed to generate training report: {e}")
+                logger.warning("Training completed successfully, but reporting failed.")
+                import traceback
+                logger.warning(traceback.format_exc())
         
         return trainer
         
     except Exception as e:
-        logger.error(f"❌ Error in Phase 1-3 training: {e}")
+        logger.error(f"Error in Phase 1-3 training: {e}")
         import traceback
         traceback.print_exc()
         sys.exit(1)

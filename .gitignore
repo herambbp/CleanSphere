@@ -9,4 +9,4 @@ hate-speech-detection/saved_features/
 hate-speech-detection/saved_models/
 hate-speech-detection/results/
 data/
-src/
+src/scraper/annotator/annotator_debug.log
