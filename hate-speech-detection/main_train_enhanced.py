@@ -71,17 +71,17 @@ def load_all_csv_datasets(data_dir: Path = RAW_DATA_DIR, exclude: List[str] = No
     for csv_file in csv_files:
         # Skip excluded files
         if csv_file.name in exclude:
-            logger.info(f"  ⏭️  Skipping {csv_file.name} (excluded)")
+            logger.info(f"  [SKIP] Skipping {csv_file.name} (excluded)")
             continue
         
         try:
             # Load CSV
-            logger.info(f"  📄 Loading {csv_file.name}...")
+            logger.info(f"  [LOAD] Loading {csv_file.name}...")
             df = pd.read_csv(csv_file, encoding="latin-1", on_bad_lines="skip")
             
             # Validate columns
             if 'tweet' not in df.columns or 'class' not in df.columns:
-                logger.warning(f"  ⚠️  Skipping {csv_file.name} - missing required columns (tweet, class)")
+                logger.warning(f"  [WARN] Skipping {csv_file.name} - missing required columns (tweet, class)")
                 continue
             
             # Clean data
@@ -91,7 +91,7 @@ def load_all_csv_datasets(data_dir: Path = RAW_DATA_DIR, exclude: List[str] = No
             rows = len(df)
             total_rows += rows
             
-            logger.info(f"  ✓ Loaded {rows:,} rows from {csv_file.name}")
+            logger.info(f"  [OK] Loaded {rows:,} rows from {csv_file.name}")
             
             # Add source column to track which dataset each row came from
             df['source_file'] = csv_file.name
@@ -99,14 +99,14 @@ def load_all_csv_datasets(data_dir: Path = RAW_DATA_DIR, exclude: List[str] = No
             all_dataframes.append(df)
             
         except Exception as e:
-            logger.error(f"  ✗ Error loading {csv_file.name}: {e}")
+            logger.error(f"  [ERROR] Error loading {csv_file.name}: {e}")
             continue
     
     if not all_dataframes:
         raise ValueError("No valid datasets could be loaded!")
     
     # Combine all dataframes
-    logger.info(f"\n📊 Combining {len(all_dataframes)} dataset(s)...")
+    logger.info(f"\n[INFO] Combining {len(all_dataframes)} dataset(s)...")
     combined_df = pd.concat(all_dataframes, ignore_index=True)
     
     # Remove duplicates
@@ -115,19 +115,19 @@ def load_all_csv_datasets(data_dir: Path = RAW_DATA_DIR, exclude: List[str] = No
     duplicates_removed = initial_count - len(combined_df)
     
     if duplicates_removed > 0:
-        logger.info(f"  🗑️  Removed {duplicates_removed:,} duplicate tweets")
+        logger.info(f"  [CLEAN] Removed {duplicates_removed:,} duplicate tweets")
     
-    logger.info(f"\n✅ Total combined dataset: {len(combined_df):,} rows")
+    logger.info(f"\n[SUCCESS] Total combined dataset: {len(combined_df):,} rows")
     
     # Print dataset breakdown
-    print("\n📈 Dataset Breakdown:")
+    print("\n[DATASET BREAKDOWN]")
     for source in combined_df['source_file'].unique():
         count = len(combined_df[combined_df['source_file'] == source])
         percentage = (count / len(combined_df)) * 100
         logger.info(f"  {source:30s}: {count:8,} ({percentage:5.2f}%)")
     
     # Print class distribution
-    print("\n📊 Class Distribution:")
+    print("\n[CLASS DISTRIBUTION]")
     for class_id in sorted(combined_df['class'].unique()):
         count = len(combined_df[combined_df['class'] == class_id])
         percentage = (count / len(combined_df)) * 100
@@ -227,22 +227,22 @@ class IncrementalTrainer:
         
         logger.info(f"Previously trained on: {len(trained_datasets)} dataset(s)")
         for ds in trained_datasets:
-            logger.info(f"  ✓ {ds}")
+            logger.info(f"  [OK] {ds}")
         
         logger.info(f"\nNew datasets found: {len(new_datasets)} dataset(s)")
         for ds in new_datasets:
-            logger.info(f"  📄 {ds}")
+            logger.info(f"  [NEW] {ds}")
         
         if not new_datasets:
-            logger.warning("⚠️  No new datasets found! Nothing to do.")
+            logger.warning("[WARNING] No new datasets found! Nothing to do.")
             return None
         
         # Decide what to load
         if new_datasets_only:
-            logger.info(f"\n📊 Loading ONLY new datasets: {new_datasets}")
+            logger.info(f"\n[INFO] Loading ONLY new datasets: {new_datasets}")
             exclude = trained_datasets
         else:
-            logger.info(f"\n📊 Loading ALL datasets (new + previously trained)")
+            logger.info(f"\n[INFO] Loading ALL datasets (new + previously trained)")
             exclude = []
         
         # Load data
@@ -257,7 +257,7 @@ class IncrementalTrainer:
         # Update trained datasets list
         all_trained = list(set(trained_datasets + new_datasets))
         self.save_trained_datasets(all_trained)
-        logger.info(f"\n✅ Updated trained datasets list: {len(all_trained)} total")
+        logger.info(f"\n[SUCCESS] Updated trained datasets list: {len(all_trained)} total")
         
         return X_train, X_val, X_test, y_train, y_val, y_test
 
@@ -293,9 +293,15 @@ def phase1_train_traditional_ml(
         collector = MetricsCollector()
         report_generator = QuickReportGenerator()
         reporting_enabled = True
-        logger.info("Reporting system initialized")
+        logger.info("[OK] Reporting system initialized")
+        
+        # Start metrics collection
+        collector.start_run()
+        logger.info("[OK] Metrics collection started")
     except Exception as e:
         logger.warning(f"Could not initialize reporting system: {e}")
+        import traceback
+        logger.warning(traceback.format_exc())
         reporting_enabled = False
     
     try:
@@ -317,8 +323,10 @@ def phase1_train_traditional_ml(
                 if reporting_enabled:
                     new_datasets, trained_datasets = trainer.identify_new_datasets()
                     all_datasets = list(set(trained_datasets + new_datasets))
+                    total_samples = len(y_train) + len(y_val) + len(y_test)
                     collector.set_datasets(
                         datasets=all_datasets,
+                        total_samples=total_samples,
                         new_datasets=new_datasets
                     )
             else:
@@ -329,27 +337,39 @@ def phase1_train_traditional_ml(
                 # Collect dataset info for reporting
                 if reporting_enabled:
                     all_datasets = [f.name for f in RAW_DATA_DIR.glob('*.csv')]
-                    collector.set_datasets(datasets=all_datasets, new_datasets=[])
+                    total_samples = len(y_train) + len(y_val) + len(y_test)
+                    collector.set_datasets(
+                        datasets=all_datasets,
+                        total_samples=total_samples,
+                        new_datasets=[]
+                    )
         else:
             logger.info("Using provided data splits")
             
             # Try to collect dataset info even with provided splits
             if reporting_enabled:
                 all_datasets = [f.name for f in RAW_DATA_DIR.glob('*.csv')]
-                collector.set_datasets(datasets=all_datasets, new_datasets=[])
+                total_samples = len(y_train) + len(y_val) + len(y_test)
+                collector.set_datasets(
+                    datasets=all_datasets,
+                    total_samples=total_samples,
+                    new_datasets=[]
+                )
         
         # Collect data split info
         if reporting_enabled:
-            collector.set_data_splits(
-                train_samples=len(y_train),
-                val_samples=len(y_val),
-                test_samples=len(y_test)
-            )
-            
             # Collect class distribution
             unique, counts = np.unique(y_train, return_counts=True)
-            class_dist = dict(zip(map(str, unique), map(int, counts)))
-            collector.set_class_distribution(class_dist)
+            class_dist = dict(zip(map(int, unique), map(int, counts)))
+            
+            # Set splits with correct method name and parameters
+            collector.set_splits(
+                train_size=len(y_train),
+                val_size=len(y_val),
+                test_size=len(y_test),
+                class_distribution=class_dist
+            )
+            logger.info("[OK] Dataset and split metrics collected")
         
         logger.info(f"Data loaded successfully:")
         logger.info(f"  Train: {len(y_train):,} samples")
@@ -405,7 +425,8 @@ def phase1_train_traditional_ml(
         
         # Collect feature info
         if reporting_enabled:
-            collector.set_feature_dimensions(X_train_features.shape[1])
+            collector.set_feature_info(X_train_features.shape[1])
+            logger.info("[OK] Feature extraction metrics collected")
         
         # Save feature extractor
         logger.info("Saving feature extractor...")
@@ -427,18 +448,34 @@ def phase1_train_traditional_ml(
         
         # Collect model metrics
         if reporting_enabled:
-            comparison_df = trainer.evaluator.get_comparison_df()
-            
-            if not comparison_df.empty:
-                for _, row in comparison_df.iterrows():
-                    model_name = row['Model'].lower().replace(' ', '_')
-                    collector.add_model_metrics(
-                        model_name=model_name,
-                        accuracy=row['Accuracy'],
-                        f1_macro=row['F1 (Macro)'],
-                        precision_macro=row['Precision (Macro)'],
-                        recall_macro=row['Recall (Macro)']
-                    )
+            try:
+                comparison_df = trainer.evaluator.get_comparison_df()
+                
+                if not comparison_df.empty:
+                    logger.info("Collecting model metrics...")
+                    for _, row in comparison_df.iterrows():
+                        model_name = row['Model'].lower().replace(' ', '_')
+                        
+                        # Prepare metrics dictionary
+                        metrics_dict = {
+                            'accuracy': float(row['Accuracy']),
+                            'f1_macro': float(row['F1 (Macro)']),
+                            'precision_macro': float(row['Precision (Macro)']),
+                            'recall_macro': float(row['Recall (Macro)'])
+                        }
+                        
+                        # Add model result using correct method
+                        collector.add_model_result(
+                            model_name=model_name,
+                            metrics=metrics_dict
+                        )
+                    logger.info(f"[OK] Collected metrics for {len(comparison_df)} models")
+                else:
+                    logger.warning("No model comparison data available")
+            except Exception as e:
+                logger.warning(f"Could not collect model metrics: {e}")
+                import traceback
+                logger.warning(traceback.format_exc())
         
         # Step 5: Summary
         print_section_header("PHASE 1-3 COMPLETE")
@@ -462,27 +499,42 @@ def phase1_train_traditional_ml(
                 print_section_header("GENERATING TRAINING REPORT")
                 
                 # Finalize metrics collection
+                logger.info("Finalizing metrics collection...")
                 metrics = collector.finalize()
+                logger.info("[OK] Metrics finalized")
+                
+                # Validate metrics
+                if not collector.validate():
+                    logger.warning("[WARNING] Metrics validation failed - some data may be missing")
+                else:
+                    logger.info("[OK] Metrics validated successfully")
                 
                 # Save to training history
+                logger.info("Saving to training history...")
                 history.add_run(metrics)
-                logger.info(f"Training run saved to history")
+                logger.info(f"[OK] Training run saved to history")
                 
-                # Get previous run for comparison
-                previous_metrics = history.get_previous_run()
-                if previous_metrics:
-                    logger.info("Previous training run found for comparison")
+                # Get previous run for comparison using correct method
+                logger.info("Checking for previous runs...")
+                all_runs = history.get_all_runs()
+                if len(all_runs) >= 2:
+                    previous_metrics = all_runs[-2]  # Get second to last run
+                    logger.info("[OK] Previous training run found for comparison")
+                else:
+                    previous_metrics = None
+                    logger.info("No previous run available for comparison")
                 
                 # Generate HTML report
+                logger.info("Generating HTML report...")
                 report_path = report_generator.generate_report(
                     metrics=metrics,
                     previous_metrics=previous_metrics
                 )
                 
                 print("\n" + "=" * 80)
-                logger.info("TRAINING REPORT GENERATED SUCCESSFULLY!")
-                logger.info(f"Report location: {report_path}")
-                logger.info(f"Open in browser: file://{report_path.absolute()}")
+                logger.info("[SUCCESS] TRAINING REPORT GENERATED SUCCESSFULLY!")
+                logger.info(f"[REPORT] Report location: {report_path}")
+                logger.info(f"[BROWSER] Open in browser: file://{report_path.absolute()}")
                 print("=" * 80 + "\n")
                 
             except Exception as e:
@@ -533,19 +585,19 @@ def main(
     # Check if data files exist
     csv_files = list(RAW_DATA_DIR.glob('*.csv'))
     if not csv_files:
-        logger.error(f"❌ No CSV files found in {RAW_DATA_DIR}")
+        logger.error(f"[ERROR] No CSV files found in {RAW_DATA_DIR}")
         logger.error("Please place dataset files in data/raw/ directory")
         sys.exit(1)
     
-    logger.info(f"✅ Found {len(csv_files)} CSV file(s) in data/raw/:")
+    logger.info(f"[OK] Found {len(csv_files)} CSV file(s) in data/raw/:")
     for csv_file in csv_files:
-        logger.info(f"  📄 {csv_file.name}")
+        logger.info(f"  [FILE] {csv_file.name}")
     
     # Phase 1-3: Traditional ML
     if not skip_phase1:
         trainer_trad = phase1_train_traditional_ml(incremental=incremental)
     else:
-        logger.info("⏭️  Skipping Phase 1-3 (Traditional ML)")
+        logger.info("[SKIP] Skipping Phase 1-3 (Traditional ML)")
         trainer_trad = None
     
     # Phase 4: Severity System (import from original main_train.py)
@@ -554,10 +606,10 @@ def main(
             from main_train import phase4_test_severity_system
             phase4_success = phase4_test_severity_system()
         except ImportError:
-            logger.warning("⚠️  Could not import phase4_test_severity_system")
+            logger.warning("[WARNING] Could not import phase4_test_severity_system")
             phase4_success = None
     else:
-        logger.info("⏭️  Skipping Phase 4 (Severity System)")
+        logger.info("[SKIP] Skipping Phase 4 (Severity System)")
         phase4_success = None
     
     # Phase 5: Deep Learning
@@ -566,10 +618,10 @@ def main(
             from main_train import phase5_train_deep_learning
             trainer_dl = phase5_train_deep_learning(use_bert=use_bert)
         except ImportError:
-            logger.warning("⚠️  Could not import phase5_train_deep_learning")
+            logger.warning("[WARNING] Could not import phase5_train_deep_learning")
             trainer_dl = None
     else:
-        logger.info("\n⏭️  Skipping Phase 5 (Deep Learning)")
+        logger.info("\n[SKIP] Skipping Phase 5 (Deep Learning)")
         logger.info("Use --phase5 flag to enable deep learning training")
         trainer_dl = None
     
@@ -579,16 +631,16 @@ def main(
             from inference.tweet_classifier import demo
             demo()
         except Exception as e:
-            logger.warning(f"⚠️  Could not run classifier demo: {e}")
+            logger.warning(f"[WARNING] Could not run classifier demo: {e}")
     
     # Final summary
     print("\n" + "=" * 80)
-    print("✅ TRAINING PIPELINE COMPLETE")
+    print("[SUCCESS] TRAINING PIPELINE COMPLETE")
     print("=" * 80)
     
-    print("\n📊 Completed Phases:")
+    print("\n[COMPLETED PHASES]")
     if not skip_phase1:
-        print("  ✅ Phase 1-3: Traditional ML + Embeddings")
+        print("  [OK] Phase 1-3: Traditional ML + Embeddings")
         if trainer_trad:
             comparison_df = trainer_trad.evaluator.get_comparison_df()
             if not comparison_df.empty:
@@ -596,31 +648,33 @@ def main(
                 print(f"     Best: {best['Model']} ({best['Accuracy']:.4f} accuracy)")
     
     if not skip_phase4:
-        print("  ✅ Phase 4: Severity Classification + Action Recommendations")
+        print("  [OK] Phase 4: Severity Classification + Action Recommendations")
     
     if run_phase5 and trainer_dl:
-        print("  ✅ Phase 5: Deep Learning Models")
+        print("  [OK] Phase 5: Deep Learning Models")
     
-    print("\n📁 Output Locations:")
+    print("\n[OUTPUT LOCATIONS]")
     print(f"  Models: {PROJECT_ROOT / 'saved_models'}")
     print(f"  Features: {PROJECT_ROOT / 'saved_features'}")
     print(f"  Results: {PROJECT_ROOT / 'results'}")
+    print(f"  Reports: {PROJECT_ROOT / 'results/training_reports'}")
     
     if incremental:
         trainer = IncrementalTrainer()
         trained = trainer.get_trained_datasets()
-        print(f"\n📚 Trained Datasets ({len(trained)}):")
+        print(f"\n[TRAINED DATASETS] ({len(trained)})")
         for ds in trained:
-            print(f"  ✓ {ds}")
+            print(f"  [OK] {ds}")
     
-    print("\n🚀 Next Steps:")
-    print("  1. Use the classifier:")
+    print("\n[NEXT STEPS]")
+    print("  1. View training report in results/training_reports/")
+    print("  2. Use the classifier:")
     print("     from inference.tweet_classifier import TweetClassifier")
     print("     classifier = TweetClassifier()")
     print("     result = classifier.classify_with_severity('Your tweet')")
     
     if incremental:
-        print("\n  2. Add more datasets:")
+        print("\n  3. Add more datasets:")
         print("     - Place new CSV files in data/raw/")
         print("     - Run: python main_train_enhanced.py --incremental")
     
@@ -660,24 +714,24 @@ INCREMENTAL TRAINING WORKFLOW:
 
 Step 1: Initial training with labeled_data.csv
    $ python main_train_enhanced.py
-   ✓ Trains on: labeled_data.csv
-   ✓ Saves: trained_datasets.txt
+   [OK] Trains on: labeled_data.csv
+   [OK] Saves: trained_datasets.txt
 
 Step 2: Add dataset2.csv to data/raw/
    $ cp dataset2.csv data/raw/
 
 Step 3: Incremental training (adds only dataset2.csv)
    $ python main_train_enhanced.py --incremental
-   ✓ Loads: dataset2.csv (NEW)
-   ✓ Skips: labeled_data.csv (already trained)
-   ✓ Updates models with new data
-   ✓ Updates: trained_datasets.txt
+   [OK] Loads: dataset2.csv (NEW)
+   [SKIP] Skips: labeled_data.csv (already trained)
+   [OK] Updates models with new data
+   [OK] Updates: trained_datasets.txt
 
 Step 4: Add dataset3.csv
    $ cp dataset3.csv data/raw/
    $ python main_train_enhanced.py --incremental
-   ✓ Loads: dataset3.csv (NEW)
-   ✓ Skips: labeled_data.csv, dataset2.csv (already trained)
+   [OK] Loads: dataset3.csv (NEW)
+   [SKIP] Skips: labeled_data.csv, dataset2.csv (already trained)
 
 DATASET FORMAT:
 ===============
@@ -728,7 +782,7 @@ if __name__ == "__main__":
     if args.usage:
         print_usage()
     elif args.list_datasets:
-        print("\n📁 Datasets in data/raw/:")
+        print("\n[DATASETS IN data/raw/]")
         print("=" * 60)
         csv_files = list(RAW_DATA_DIR.glob('*.csv'))
         if not csv_files:
@@ -736,15 +790,15 @@ if __name__ == "__main__":
         else:
             for csv_file in csv_files:
                 size = csv_file.stat().st_size / 1024  # KB
-                print(f"  📄 {csv_file.name:30s} ({size:.1f} KB)")
+                print(f"  [FILE] {csv_file.name:30s} ({size:.1f} KB)")
         
         # Show trained datasets if incremental mode has been used
         trainer = IncrementalTrainer()
         trained = trainer.get_trained_datasets()
         if trained:
-            print(f"\n✅ Already trained on ({len(trained)}):")
+            print(f"\n[ALREADY TRAINED ON] ({len(trained)})")
             for ds in trained:
-                print(f"  ✓ {ds}")
+                print(f"  [OK] {ds}")
     else:
         main(
             skip_phase1=args.skip_phase1,
