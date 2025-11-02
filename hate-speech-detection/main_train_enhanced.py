@@ -1,14 +1,17 @@
 """
 Enhanced Main Training Script - Hate Speech Detection Project
-CORRECTED VERSION with proper reporting integration
+==============================================================
+
+NOW INTEGRATED WITH HEAVY GPU BERT SUPPORT!
 
 Supports:
 1. Training on ALL datasets in data/raw
 2. Incremental training (adding new data to existing models)
+3. Heavy GPU BERT models (BERT-Large, RoBERTa-Large, etc.)
 
 PHASE 1-3: Traditional ML Models + Embeddings
 PHASE 4: Severity Classification System
-PHASE 5: Deep Learning Models (LSTM, BiLSTM, CNN, BERT)
+PHASE 5: Heavy GPU Deep Learning Models (BERT-Large, RoBERTa-Large, etc.)
 """
 
 import sys
@@ -18,8 +21,6 @@ import numpy as np
 from pathlib import Path
 from typing import List, Tuple, Optional
 import joblib
-from datetime import datetime
-
 warnings.filterwarnings('ignore')
 
 # Import all Phase 1-3 modules
@@ -32,101 +33,31 @@ from models.traditional_ml_trainer import train_traditional_models
 from reporting import TrainingHistory, MetricsCollector, QuickReportGenerator
 
 
-# Import Phase 5 modules
+# Import Phase 5 modules - Traditional Deep Learning
 try:
     from models.deep_learning_trainer import train_deep_learning_models, HAS_TENSORFLOW
     HAS_DL = True
 except ImportError:
     HAS_DL = False
     HAS_TENSORFLOW = False
-    logger.warning("Deep learning modules not available. Phase 5 will be skipped.")
+    logger.warning("Traditional deep learning modules not available.")
+
+# Import Phase 5 modules - Heavy GPU BERT (NEW!)
+try:
+    from bert_integration import (
+        train_heavy_gpu_bert,
+        HeavyGPUBERTTrainer,
+        quick_train_bert_large,
+        quick_train_roberta_large,
+        train_all_large_models,
+        HAS_HEAVY_BERT
+    )
+    logger.info("[OK] Heavy GPU BERT modules loaded successfully")
+except ImportError:
+    HAS_HEAVY_BERT = False
+    logger.warning("Heavy GPU BERT modules not available. Install: pip install torch transformers")
 
 from inference.tweet_classifier import TweetClassifier, demo
-
-
-class DualLogger:
-    """Logger that writes to both console and file simultaneously"""
-    
-    def __init__(self, log_file='results/training.log'):
-        self.log_file = Path(log_file)
-        self.log_file.parent.mkdir(parents=True, exist_ok=True)
-        
-        # Initialize log file with header
-        with open(self.log_file, 'w', encoding='utf-8') as f:
-            f.write("=" * 80 + "\n")
-            f.write(f"Training Log - {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
-            f.write("=" * 80 + "\n\n")
-        
-        # Store original stdout and stderr
-        self.original_stdout = sys.stdout
-        self.original_stderr = sys.stderr
-        
-        # Create file handle
-        self.log_handle = open(self.log_file, 'a', encoding='utf-8', buffering=1)
-    
-    def write(self, message):
-        """Write to both console and file"""
-        # Write to console
-        self.original_stdout.write(message)
-        self.original_stdout.flush()
-        
-        # Write to file
-        self.log_handle.write(message)
-        self.log_handle.flush()
-    
-    def flush(self):
-        """Flush both outputs"""
-        self.original_stdout.flush()
-        self.log_handle.flush()
-    
-    def close(self):
-        """Close file handle"""
-        if hasattr(self, 'log_handle'):
-            self.log_handle.close()
-    
-    def __enter__(self):
-        """Context manager entry"""
-        sys.stdout = self
-        sys.stderr = self
-        return self
-    
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        """Context manager exit"""
-        sys.stdout = self.original_stdout
-        sys.stderr = self.original_stderr
-        self.close()
-
-
-def setup_file_logging(log_file='results/training.log'):
-    """
-    Setup file logging for the entire script.
-    Call this at the beginning of main() function.
-    
-    Returns:
-        DualLogger instance (for cleanup later)
-    """
-    dual_logger = DualLogger(log_file)
-    sys.stdout = dual_logger
-    sys.stderr = dual_logger
-    
-    print(f"[LOGGING] Output will be logged to: {dual_logger.log_file.absolute()}\n")
-    
-    return dual_logger
-
-
-def cleanup_file_logging(dual_logger):
-    """
-    Cleanup file logging.
-    Call this at the end of main() function or in a finally block.
-    """
-    if dual_logger:
-        sys.stdout = dual_logger.original_stdout
-        sys.stderr = dual_logger.original_stderr
-        dual_logger.close()
-        print(f"\n[LOGGING] Training log saved to: {dual_logger.log_file.absolute()}")
-
-
-
 
 # ==================== DATASET LOADING ====================
 
@@ -195,7 +126,7 @@ def load_all_csv_datasets(data_dir: Path = RAW_DATA_DIR, exclude: List[str] = No
         raise ValueError("No valid datasets could be loaded!")
     
     # Combine all dataframes
-    logger.info(f"\n[COMBINE] Combining {len(all_dataframes)} dataset(s)...")
+    logger.info(f"\n[INFO] Combining {len(all_dataframes)} dataset(s)...")
     combined_df = pd.concat(all_dataframes, ignore_index=True)
     
     # Remove duplicates
@@ -209,14 +140,14 @@ def load_all_csv_datasets(data_dir: Path = RAW_DATA_DIR, exclude: List[str] = No
     logger.info(f"\n[SUCCESS] Total combined dataset: {len(combined_df):,} rows")
     
     # Print dataset breakdown
-    print("\n[BREAKDOWN] Dataset Breakdown:")
+    print("\n[DATASET BREAKDOWN]")
     for source in combined_df['source_file'].unique():
         count = len(combined_df[combined_df['source_file'] == source])
         percentage = (count / len(combined_df)) * 100
         logger.info(f"  {source:30s}: {count:8,} ({percentage:5.2f}%)")
     
     # Print class distribution
-    print("\n[DISTRIBUTION] Class Distribution:")
+    print("\n[CLASS DISTRIBUTION]")
     for class_id in sorted(combined_df['class'].unique()):
         count = len(combined_df[combined_df['class'] == class_id])
         percentage = (count / len(combined_df)) * 100
@@ -323,15 +254,15 @@ class IncrementalTrainer:
             logger.info(f"  [NEW] {ds}")
         
         if not new_datasets:
-            logger.warning("[WARN] No new datasets found! Nothing to do.")
+            logger.warning("[WARNING] No new datasets found! Nothing to do.")
             return None
         
         # Decide what to load
         if new_datasets_only:
-            logger.info(f"\n[LOAD] Loading ONLY new datasets: {new_datasets}")
+            logger.info(f"\n[INFO] Loading ONLY new datasets: {new_datasets}")
             exclude = trained_datasets
         else:
-            logger.info(f"\n[LOAD] Loading ALL datasets (new + previously trained)")
+            logger.info(f"\n[INFO] Loading ALL datasets (new + previously trained)")
             exclude = []
         
         # Load data
@@ -594,7 +525,7 @@ def phase1_train_traditional_ml(
                 
                 # Validate metrics
                 if not collector.validate():
-                    logger.warning("[WARN] Metrics validation failed - some data may be missing")
+                    logger.warning("[WARNING] Metrics validation failed - some data may be missing")
                 else:
                     logger.info("[OK] Metrics validated successfully")
                 
@@ -622,7 +553,7 @@ def phase1_train_traditional_ml(
                 
                 print("\n" + "=" * 80)
                 logger.info("[SUCCESS] TRAINING REPORT GENERATED SUCCESSFULLY!")
-                logger.info(f"[FILE] Report location: {report_path}")
+                logger.info(f"[REPORT] Report location: {report_path}")
                 logger.info(f"[BROWSER] Open in browser: file://{report_path.absolute()}")
                 print("=" * 80 + "\n")
                 
@@ -641,13 +572,99 @@ def phase1_train_traditional_ml(
         sys.exit(1)
 
 
+# ==================== PHASE 5: HEAVY GPU BERT TRAINING ====================
+
+def phase5_train_heavy_gpu_bert(
+    X_train=None, X_val=None, X_test=None,
+    y_train=None, y_val=None, y_test=None,
+    models: List[str] = None,
+    use_ensemble: bool = False
+):
+    """
+    Phase 5: Train Heavy GPU BERT models (BERT-Large, RoBERTa-Large, etc.)
+    
+    Args:
+        X_train, X_val, X_test, y_train, y_val, y_test: Data splits
+        models: List of models to train (default: ['bert-large', 'roberta-base'])
+        use_ensemble: Whether to use ensemble prediction
+    
+    Returns:
+        HeavyGPUBERTTrainer instance
+    """
+    print_section_header("PHASE 5: HEAVY GPU BERT TRAINING")
+    
+    if not HAS_HEAVY_BERT:
+        logger.error("[ERROR] Heavy GPU BERT modules not available!")
+        logger.error("Install with: pip install torch transformers")
+        logger.error("Make sure bert_model_heavy_gpu.py and bert_integration.py are in project root")
+        return None
+    
+    # Check if data is provided
+    if X_train is None or y_train is None:
+        logger.error("[ERROR] Training data not provided!")
+        logger.error("Run Phase 1-3 first or provide data splits")
+        return None
+    
+    # Set default models if not specified
+    if models is None:
+        models = ['bert-large', 'roberta-base']
+        logger.info(f"Using default models: {models}")
+    
+    logger.info(f"\n[INFO] Training {len(models)} model(s): {', '.join(models)}")
+    logger.info(f"[INFO] Training samples: {len(X_train):,}")
+    logger.info(f"[INFO] Validation samples: {len(X_val):,}")
+    logger.info(f"[INFO] Test samples: {len(X_test):,}")
+    
+    # Convert numpy arrays to lists if needed
+    if isinstance(X_train, np.ndarray):
+        X_train = X_train.tolist()
+    if isinstance(X_val, np.ndarray):
+        X_val = X_val.tolist()
+    if isinstance(X_test, np.ndarray):
+        X_test = X_test.tolist()
+    
+    # Train models
+    try:
+        trainer = train_heavy_gpu_bert(
+            X_train=X_train,
+            y_train=y_train,
+            X_val=X_val,
+            y_val=y_val,
+            X_test=X_test,
+            y_test=y_test,
+            model_names=models,
+            use_ensemble=use_ensemble
+        )
+        
+        if trainer:
+            logger.info("\n[SUCCESS] Phase 5 Heavy GPU BERT training complete!")
+            
+            # Get best model
+            try:
+                best_name, best_model = trainer.get_best_model()
+                logger.info(f"[BEST MODEL] {best_name}")
+                logger.info(f"[TEST ACCURACY] {trainer.best_accuracy:.4f}")
+            except:
+                logger.warning("Could not retrieve best model info")
+        
+        return trainer
+        
+    except Exception as e:
+        logger.error(f"[ERROR] Phase 5 training failed: {e}")
+        import traceback
+        traceback.print_exc()
+        return None
+
+
 # ==================== MAIN ====================
 
 def main(
     skip_phase1: bool = False,
     skip_phase4: bool = False,
     run_phase5: bool = False,
-    use_bert: bool = False,
+    phase5_models: List[str] = None,
+    use_bert_traditional: bool = False,
+    use_ensemble: bool = False,
     incremental: bool = False,
     load_all_datasets: bool = True
 ):
@@ -657,8 +674,10 @@ def main(
     Args:
         skip_phase1: Skip Phase 1-3 (traditional ML)
         skip_phase4: Skip Phase 4 (severity testing)
-        run_phase5: Run Phase 5 (deep learning)
-        use_bert: Include BERT in Phase 5
+        run_phase5: Run Phase 5 (heavy GPU BERT)
+        phase5_models: List of BERT models to train (e.g., ['bert-large', 'roberta-large'])
+        use_bert_traditional: Include traditional BERT in old Phase 5 (deprecated)
+        use_ensemble: Use ensemble prediction in Phase 5
         incremental: Use incremental training mode (add new datasets to existing model)
         load_all_datasets: Load all datasets from data/raw (default: True)
     """
@@ -669,6 +688,7 @@ def main(
     print(f"Project Root: {PROJECT_ROOT}")
     print(f"Mode: {'INCREMENTAL' if incremental else 'FULL TRAINING'}")
     print(f"Load all datasets: {load_all_datasets}")
+    print(f"Heavy GPU BERT available: {HAS_HEAVY_BERT}")
     print("=" * 80)
     
     # Check if data files exist
@@ -678,41 +698,86 @@ def main(
         logger.error("Please place dataset files in data/raw/ directory")
         sys.exit(1)
     
-    logger.info(f"[SUCCESS] Found {len(csv_files)} CSV file(s) in data/raw/:")
+    logger.info(f"[OK] Found {len(csv_files)} CSV file(s) in data/raw/:")
     for csv_file in csv_files:
         logger.info(f"  [FILE] {csv_file.name}")
     
+    # Load data (needed for multiple phases)
+    X_train, X_val, X_test, y_train, y_val, y_test = None, None, None, None, None, None
+    
     # Phase 1-3: Traditional ML
+    trainer_trad = None
     if not skip_phase1:
         trainer_trad = phase1_train_traditional_ml(incremental=incremental)
+        
+        # Get data splits from Phase 1 if Phase 5 will run
+        if run_phase5 and trainer_trad is not None:
+            # Load saved splits for Phase 5
+            try:
+                from data_handler import DataSplitter
+                splitter = DataSplitter()
+                X_train, X_val, X_test, y_train, y_val, y_test = splitter.load_split()
+                logger.info("[OK] Data splits loaded for Phase 5")
+            except:
+                logger.warning("Could not load data splits from Phase 1")
     else:
         logger.info("[SKIP] Skipping Phase 1-3 (Traditional ML)")
-        trainer_trad = None
+        
+        # If Phase 5 will run, still need to load data
+        if run_phase5:
+            if incremental:
+                trainer_inc = IncrementalTrainer()
+                result = trainer_inc.incremental_train(new_datasets_only=True)
+                if result is not None:
+                    X_train, X_val, X_test, y_train, y_val, y_test = result
+            else:
+                logger.info("Loading ALL datasets from data/raw for Phase 5...")
+                combined_df = load_all_csv_datasets()
+                X_train, X_val, X_test, y_train, y_val, y_test = prepare_data_from_combined_df(combined_df)
     
-    # Phase 4: Severity System (import from original main_train.py)
+    # Phase 4: Severity System
     if not skip_phase4:
         try:
             from main_train import phase4_test_severity_system
             phase4_success = phase4_test_severity_system()
         except ImportError:
-            logger.warning("[WARN] Could not import phase4_test_severity_system")
+            logger.warning("[WARNING] Could not import phase4_test_severity_system")
             phase4_success = None
     else:
         logger.info("[SKIP] Skipping Phase 4 (Severity System)")
         phase4_success = None
     
-    # Phase 5: Deep Learning
+    # Phase 5: Heavy GPU BERT - NEW!
+    trainer_bert = None
     if run_phase5:
-        try:
-            from main_train import phase5_train_deep_learning
-            trainer_dl = phase5_train_deep_learning(use_bert=use_bert)
-        except ImportError:
-            logger.warning("[WARN] Could not import phase5_train_deep_learning")
-            trainer_dl = None
+        if X_train is None:
+            logger.error("[ERROR] Cannot run Phase 5 without data!")
+            logger.error("Run without --skip-phase1 or ensure data can be loaded")
+        else:
+            trainer_bert = phase5_train_heavy_gpu_bert(
+                X_train=X_train,
+                y_train=y_train,
+                X_val=X_val,
+                y_val=y_val,
+                X_test=X_test,
+                y_test=y_test,
+                models=phase5_models,
+                use_ensemble=use_ensemble
+            )
     else:
-        logger.info("\n[SKIP] Skipping Phase 5 (Deep Learning)")
-        logger.info("Use --phase5 flag to enable deep learning training")
-        trainer_dl = None
+        # Check for traditional Phase 5 (old BERT)
+        if use_bert_traditional:
+            logger.info("\n[INFO] Running traditional Phase 5 (old BERT)")
+            try:
+                from main_train import phase5_train_deep_learning
+                trainer_dl = phase5_train_deep_learning(use_bert=True)
+            except ImportError:
+                logger.warning("[WARNING] Could not import phase5_train_deep_learning")
+                trainer_dl = None
+        else:
+            logger.info("\n[SKIP] Skipping Phase 5 (Heavy GPU BERT)")
+            logger.info("Use --phase5 flag to enable heavy GPU BERT training")
+            logger.info("Available models: bert-large, roberta-large, distilbert, etc.")
     
     # Test the classifier
     if not skip_phase1 or not skip_phase4:
@@ -720,29 +785,34 @@ def main(
             from inference.tweet_classifier import demo
             demo()
         except Exception as e:
-            logger.warning(f"[WARN] Could not run classifier demo: {e}")
+            logger.warning(f"[WARNING] Could not run classifier demo: {e}")
     
     # Final summary
     print("\n" + "=" * 80)
     print("[SUCCESS] TRAINING PIPELINE COMPLETE")
     print("=" * 80)
     
-    print("\n[COMPLETED] Completed Phases:")
+    print("\n[COMPLETED PHASES]")
     if not skip_phase1:
         print("  [OK] Phase 1-3: Traditional ML + Embeddings")
         if trainer_trad:
-            comparison_df = trainer_trad.evaluator.get_comparison_df()
-            if not comparison_df.empty:
-                best = comparison_df.iloc[0]
-                print(f"     Best: {best['Model']} ({best['Accuracy']:.4f} accuracy)")
+            try:
+                comparison_df = trainer_trad.evaluator.get_comparison_df()
+                if not comparison_df.empty:
+                    best = comparison_df.iloc[0]
+                    print(f"     Best: {best['Model']} ({best['Accuracy']:.4f} accuracy)")
+            except:
+                pass
     
     if not skip_phase4:
         print("  [OK] Phase 4: Severity Classification + Action Recommendations")
     
-    if run_phase5 and trainer_dl:
-        print("  [OK] Phase 5: Deep Learning Models")
+    if run_phase5 and trainer_bert:
+        print("  [OK] Phase 5: Heavy GPU BERT Models")
+        if trainer_bert.best_model_name:
+            print(f"     Best: {trainer_bert.best_model_name} ({trainer_bert.best_accuracy:.4f} accuracy)")
     
-    print("\n[OUTPUT] Output Locations:")
+    print("\n[OUTPUT LOCATIONS]")
     print(f"  Models: {PROJECT_ROOT / 'saved_models'}")
     print(f"  Features: {PROJECT_ROOT / 'saved_features'}")
     print(f"  Results: {PROJECT_ROOT / 'results'}")
@@ -751,19 +821,25 @@ def main(
     if incremental:
         trainer = IncrementalTrainer()
         trained = trainer.get_trained_datasets()
-        print(f"\n[TRAINED] Trained Datasets ({len(trained)}):")
+        print(f"\n[TRAINED DATASETS] ({len(trained)})")
         for ds in trained:
             print(f"  [OK] {ds}")
     
-    print("\n[NEXT] Next Steps:")
+    print("\n[NEXT STEPS]")
     print("  1. View training report in results/training_reports/")
     print("  2. Use the classifier:")
     print("     from inference.tweet_classifier import TweetClassifier")
     print("     classifier = TweetClassifier()")
     print("     result = classifier.classify_with_severity('Your tweet')")
     
+    if HAS_HEAVY_BERT and run_phase5:
+        print("\n  3. Use Heavy GPU BERT model:")
+        print("     from bert_model_heavy_gpu import HeavyGPUBERTModel")
+        print("     model = HeavyGPUBERTModel.load('saved_models/bert_bert_large')")
+        print("     predictions = model.predict(texts)")
+    
     if incremental:
-        print("\n  3. Add more datasets:")
+        print("\n  4. Add more datasets:")
         print("     - Place new CSV files in data/raw/")
         print("     - Run: python main_train_enhanced.py --incremental")
     
@@ -775,52 +851,63 @@ def main(
 def print_usage():
     """Print usage examples."""
     print("""
-USAGE EXAMPLES:
-===============
+USAGE EXAMPLES (WITH HEAVY GPU BERT):
+======================================
 
-1. Train on ALL datasets in data/raw (first time):
+TRADITIONAL TRAINING:
+1. Train on ALL datasets (traditional ML only):
    python main_train_enhanced.py
 
 2. Add NEW dataset to existing model (incremental):
    python main_train_enhanced.py --incremental
-   
-   How it works:
-   - Tracks which datasets have been trained on
-   - Only trains on NEW datasets not seen before
-   - Updates existing models with new data
-   
-3. Retrain everything from scratch:
-   python main_train_enhanced.py --retrain
 
-4. Train with deep learning:
-   python main_train_enhanced.py --phase5
+HEAVY GPU BERT TRAINING (NEW!):
+3. Train with BERT-Large (recommended):
+   python main_train_enhanced.py --phase5 --models bert-large
 
-5. Skip certain phases:
-   python main_train_enhanced.py --skip-phase1 --skip-phase4
+4. Train multiple models and compare:
+   python main_train_enhanced.py --phase5 --models bert-large roberta-base
 
-INCREMENTAL TRAINING WORKFLOW:
-================================
+5. Train with ensemble (best accuracy):
+   python main_train_enhanced.py --phase5 --models bert-large roberta-base --ensemble
 
+6. Skip traditional ML, only BERT (faster):
+   python main_train_enhanced.py --skip-phase1 --phase5 --models bert-large
+
+7. Everything combined:
+   python main_train_enhanced.py --phase5 --models bert-large roberta-large --ensemble
+
+AVAILABLE BERT MODELS:
+======================
+- bert-base          (110M params) - Fast baseline
+- bert-large         (340M params) - Better accuracy  [RECOMMENDED]
+- roberta-base       (125M params) - Improved BERT
+- roberta-large      (355M params) - Best performance [RECOMMENDED]
+- distilbert         (66M params)  - Fast inference
+- albert-base        (12M params)  - Efficient
+- albert-large       (18M params)  - Efficient
+- albert-xlarge      (60M params)  - Very efficient
+- albert-xxlarge     (235M params) - Extremely efficient
+
+SKIP OPTIONS:
+============
+- --skip-phase1   Skip traditional ML training
+- --skip-phase4   Skip severity system testing
+
+INCREMENTAL TRAINING:
+=====================
 Step 1: Initial training with labeled_data.csv
    $ python main_train_enhanced.py
-   [OK] Trains on: labeled_data.csv
-   [OK] Saves: trained_datasets.txt
 
 Step 2: Add dataset2.csv to data/raw/
    $ cp dataset2.csv data/raw/
 
 Step 3: Incremental training (adds only dataset2.csv)
    $ python main_train_enhanced.py --incremental
-   [OK] Loads: dataset2.csv (NEW)
-   [OK] Skips: labeled_data.csv (already trained)
-   [OK] Updates models with new data
-   [OK] Updates: trained_datasets.txt
 
-Step 4: Add dataset3.csv
+Step 4: Add dataset3.csv and train with BERT:
    $ cp dataset3.csv data/raw/
-   $ python main_train_enhanced.py --incremental
-   [OK] Loads: dataset3.csv (NEW)
-   [OK] Skips: labeled_data.csv, dataset2.csv (already trained)
+   $ python main_train_enhanced.py --incremental --phase5 --models bert-large
 
 DATASET FORMAT:
 ===============
@@ -830,6 +917,14 @@ Each CSV must have these columns:
 
 Optional columns:
 - Any other metadata (will be preserved)
+
+GPU REQUIREMENTS:
+=================
+- bert-base:      8GB+ GPU
+- bert-large:     16GB+ GPU (RECOMMENDED)
+- roberta-large:  24GB+ GPU (BEST)
+
+For more details, see: HEAVY_GPU_BERT_README.md
 """)
 
 
@@ -839,14 +934,14 @@ if __name__ == "__main__":
     import argparse
     
     parser = argparse.ArgumentParser(
-        description='Enhanced Hate Speech Detection Training - All Datasets + Incremental'
+        description='Enhanced Hate Speech Detection Training - With Heavy GPU BERT Support'
     )
     
     # Training modes
     parser.add_argument('--incremental', action='store_true',
-                       help='Incremental training: only train on NEW datasets not seen before')
+                       help='Incremental training: only train on NEW datasets')
     parser.add_argument('--retrain', action='store_true',
-                       help='Force full retraining on all datasets (ignore history)')
+                       help='Force full retraining on all datasets')
     
     # Skip options
     parser.add_argument('--skip-phase1', action='store_true',
@@ -854,24 +949,42 @@ if __name__ == "__main__":
     parser.add_argument('--skip-phase4', action='store_true',
                        help='Skip Phase 4 (Severity System)')
     
-    # Phase 5 options
+    # Phase 5 options - ENHANCED FOR HEAVY GPU
     parser.add_argument('--phase5', action='store_true',
-                       help='Run Phase 5 (Deep Learning Models)')
+                       help='Run Phase 5 (Heavy GPU BERT Models)')
+    parser.add_argument('--models', nargs='+',
+                       help='BERT models to train (e.g., bert-large roberta-large)')
+    parser.add_argument('--ensemble', action='store_true',
+                       help='Use ensemble prediction (requires multiple models)')
     parser.add_argument('--use-bert', action='store_true',
-                       help='Include BERT in Phase 5 (slow, ~30 min)')
+                       help='Use traditional BERT (deprecated, use --phase5 instead)')
     
     # Utility options
     parser.add_argument('--usage', action='store_true',
                        help='Show usage examples')
     parser.add_argument('--list-datasets', action='store_true',
                        help='List all datasets in data/raw/')
+    parser.add_argument('--list-models', action='store_true',
+                       help='List available BERT models')
     
     args = parser.parse_args()
     
     if args.usage:
         print_usage()
+    elif args.list_models:
+        print("\n[AVAILABLE BERT MODELS FOR HEAVY GPU]")
+        print("=" * 60)
+        if HAS_HEAVY_BERT:
+            from bert_model_heavy_gpu import HeavyGPUBERTConfig
+            for key, value in HeavyGPUBERTConfig.MODEL_OPTIONS.items():
+                print(f"  {key:20s} -> {value}")
+            print("\nUse with --models flag:")
+            print("  python main_train_enhanced.py --phase5 --models bert-large")
+        else:
+            print("  Heavy GPU BERT not available")
+            print("  Install: pip install torch transformers")
     elif args.list_datasets:
-        print("\n[DATASETS] Datasets in data/raw/:")
+        print("\n[DATASETS IN data/raw/]")
         print("=" * 60)
         csv_files = list(RAW_DATA_DIR.glob('*.csv'))
         if not csv_files:
@@ -881,20 +994,20 @@ if __name__ == "__main__":
                 size = csv_file.stat().st_size / 1024  # KB
                 print(f"  [FILE] {csv_file.name:30s} ({size:.1f} KB)")
         
-        # Show trained datasets if incremental mode has been used
+        # Show trained datasets
         trainer = IncrementalTrainer()
         trained = trainer.get_trained_datasets()
         if trained:
-            print(f"\n[TRAINED] Already trained on ({len(trained)}):")
+            print(f"\n[ALREADY TRAINED ON] ({len(trained)})")
             for ds in trained:
                 print(f"  [OK] {ds}")
     else:
-        # Enable file logging for training
-        with DualLogger('results/training.log'):
-            main(
-                skip_phase1=args.skip_phase1,
-                skip_phase4=args.skip_phase4,
-                run_phase5=args.phase5,
-                use_bert=args.use_bert,
-                incremental=args.incremental and not args.retrain
-            )
+        main(
+            skip_phase1=args.skip_phase1,
+            skip_phase4=args.skip_phase4,
+            run_phase5=args.phase5,
+            phase5_models=args.models,
+            use_bert_traditional=args.use_bert,
+            use_ensemble=args.ensemble,
+            incremental=args.incremental and not args.retrain
+        )
