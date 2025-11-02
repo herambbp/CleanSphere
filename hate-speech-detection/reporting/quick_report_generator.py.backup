@@ -1,7 +1,6 @@
 """
-Quick Report Generator - Training Report Creation (FIXED VERSION)
+Quick Report Generator - Training Report Creation
 Generates HTML reports with embedded visualizations for training runs.
-Handles missing/None values gracefully.
 """
 
 import io
@@ -32,7 +31,6 @@ class QuickReportGenerator:
     - Historical comparison (if previous runs exist)
     - Actionable recommendations
     - Embedded base64 charts (no separate files)
-    - Handles missing/None values gracefully
     """
     
     def __init__(self, output_dir: Optional[Path] = None):
@@ -165,10 +163,6 @@ class QuickReportGenerator:
             font-weight: bold;
             color: #333;
         }
-        .metric-card .value.na {
-            font-size: 1.5em;
-            color: #999;
-        }
         .chart-container {
             margin: 20px 0;
             text-align: center;
@@ -219,14 +213,6 @@ class QuickReportGenerator:
         .recommendations li {
             margin: 8px 0;
         }
-        .warning-box {
-            background: #f8d7da;
-            border-left: 4px solid #dc3545;
-            padding: 15px;
-            margin: 10px 0;
-            border-radius: 4px;
-            color: #721c24;
-        }
         .footer {
             text-align: center;
             padding: 20px;
@@ -258,32 +244,10 @@ class QuickReportGenerator:
         """Generate executive summary section."""
         run_id = metrics.get('run_id', 'N/A')
         timestamp = metrics.get('timestamp', 'N/A')
-        best_model = metrics.get('best_model')
-        best_accuracy = metrics.get('best_accuracy', 0)
+        best_model = metrics.get('best_model', 'N/A')
+        best_accuracy = metrics.get('best_accuracy', 0) * 100
         total_samples = metrics.get('total_samples', 0)
         duration = metrics.get('duration_seconds', 0)
-        
-        # Handle None or missing best_model
-        if best_model is None or best_model == '':
-            best_model_display = 'N/A'
-            best_model_class = 'na'
-            warning_message = """
-            <div class="warning-box">
-                <strong>Warning:</strong> No best model found. This usually means model training 
-                didn't complete properly or metrics weren't collected. Check your training logs.
-            </div>
-"""
-        else:
-            best_model_display = best_model.upper()
-            best_model_class = ''
-            warning_message = ''
-        
-        # Format accuracy
-        if best_accuracy > 0:
-            accuracy_display = f"{best_accuracy * 100:.2f}%"
-        else:
-            accuracy_display = 'N/A'
-            best_model_class = 'na'
         
         html = f"""
         <div class="header">
@@ -293,15 +257,14 @@ class QuickReportGenerator:
         
         <div class="section">
             <h2>Executive Summary</h2>
-            {warning_message}
             <div class="metrics-grid">
                 <div class="metric-card">
                     <div class="label">Best Model</div>
-                    <div class="value {best_model_class}">{best_model_display}</div>
+                    <div class="value">{best_model.upper()}</div>
                 </div>
                 <div class="metric-card">
                     <div class="label">Best Accuracy</div>
-                    <div class="value {best_model_class}">{accuracy_display}</div>
+                    <div class="value">{best_accuracy:.2f}%</div>
                 </div>
                 <div class="metric-card">
                     <div class="label">Total Samples</div>
@@ -314,10 +277,9 @@ class QuickReportGenerator:
             </div>
 """
         
-        if previous_metrics and best_accuracy > 0:
+        if previous_metrics:
             prev_accuracy = previous_metrics.get('best_accuracy', 0) * 100
-            curr_accuracy = best_accuracy * 100
-            diff = curr_accuracy - prev_accuracy
+            diff = best_accuracy - prev_accuracy
             change_class = 'improvement' if diff > 0 else 'decline'
             change_text = f"+{diff:.2f}%" if diff > 0 else f"{diff:.2f}%"
             
@@ -353,8 +315,7 @@ class QuickReportGenerator:
         # Add class distribution chart
         if HAS_PLOTTING and class_dist:
             chart = self._create_class_distribution_chart(class_dist)
-            if chart:
-                html += f"""
+            html += f"""
             <div class="chart-container">
                 <h3>Class Distribution</h3>
                 <img src="data:image/png;base64,{chart}" alt="Class Distribution">
@@ -398,10 +359,9 @@ class QuickReportGenerator:
 """
         
         # Add split visualization
-        if HAS_PLOTTING and total > 0:
+        if HAS_PLOTTING:
             chart = self._create_split_chart(train_samples, val_samples, test_samples)
-            if chart:
-                html += f"""
+            html += f"""
             <div class="chart-container">
                 <img src="data:image/png;base64,{chart}" alt="Data Split">
             </div>
@@ -417,20 +377,6 @@ class QuickReportGenerator:
         html = """
         <div class="section">
             <h2>Model Performance Comparison</h2>
-"""
-        
-        if not models:
-            html += """
-            <div class="warning-box">
-                <strong>Warning:</strong> No model performance data available. 
-                This means model metrics weren't collected during training.
-                Check your training script's model metrics collection code.
-            </div>
-        </div>
-"""
-            return html
-        
-        html += """
             <table class="comparison-table">
                 <thead>
                     <tr>
@@ -475,8 +421,7 @@ class QuickReportGenerator:
         # Add performance comparison chart
         if HAS_PLOTTING and models:
             chart = self._create_model_comparison_chart(models)
-            if chart:
-                html += f"""
+            html += f"""
             <div class="chart-container">
                 <h3>Model Performance Comparison</h3>
                 <img src="data:image/png;base64,{chart}" alt="Model Comparison">
@@ -519,23 +464,15 @@ class QuickReportGenerator:
             curr_val = current.get(key, 0)
             
             if is_percentage:
-                prev_display = f"{prev_val * 100:.2f}%" if prev_val else 'N/A'
-                curr_display = f"{curr_val * 100:.2f}%" if curr_val else 'N/A'
-                if prev_val and curr_val:
-                    diff = (curr_val - prev_val) * 100
-                    diff_display = f"{diff:+.2f}%"
-                else:
-                    diff = 0
-                    diff_display = 'N/A'
+                prev_display = f"{prev_val * 100:.2f}%"
+                curr_display = f"{curr_val * 100:.2f}%"
+                diff = (curr_val - prev_val) * 100
+                diff_display = f"{diff:+.2f}%"
             else:
-                prev_display = f"{prev_val:,.1f}" if prev_val else 'N/A'
-                curr_display = f"{curr_val:,.1f}" if curr_val else 'N/A'
-                if prev_val and curr_val:
-                    diff = curr_val - prev_val
-                    diff_display = f"{diff:+,.1f}"
-                else:
-                    diff = 0
-                    diff_display = 'N/A'
+                prev_display = f"{prev_val:,.1f}"
+                curr_display = f"{curr_val:,.1f}"
+                diff = curr_val - prev_val
+                diff_display = f"{diff:+,.1f}"
             
             change_class = 'improvement' if diff > 0 else 'decline' if diff < 0 else ''
             
@@ -589,21 +526,8 @@ class QuickReportGenerator:
         """Generate actionable recommendations based on metrics."""
         recommendations = []
         
-        best_model = metrics.get('best_model')
         best_accuracy = metrics.get('best_accuracy', 0)
         total_samples = metrics.get('total_samples', 0)
-        models = metrics.get('models', {})
-        
-        # Check if training completed properly
-        if not best_model or not models:
-            recommendations.append(
-                "CRITICAL: Model training did not complete properly. "
-                "Check your training script to ensure model metrics are being collected correctly."
-            )
-            recommendations.append(
-                "Verify that 'collector.add_model_result()' is being called for each trained model."
-            )
-            return recommendations
         
         # Accuracy-based recommendations
         if best_accuracy < 0.80:
@@ -627,20 +551,23 @@ class QuickReportGenerator:
         # Historical comparison recommendations
         if previous_metrics:
             prev_accuracy = previous_metrics.get('best_accuracy', 0)
-            if prev_accuracy and best_accuracy < prev_accuracy - 0.02:
+            if best_accuracy < prev_accuracy - 0.02:
                 recommendations.append(
                     "Performance declined from previous run. Verify data quality and feature consistency."
                 )
-            elif prev_accuracy and best_accuracy > prev_accuracy + 0.02:
+            elif best_accuracy > prev_accuracy + 0.02:
                 recommendations.append(
                     "Significant improvement detected! Document changes that led to this improvement."
                 )
         
         # Model-specific recommendations
-        if best_model == 'xgboost':
-            recommendations.append(
-                "XGBoost performed best. Consider hyperparameter tuning for further gains."
-            )
+        models = metrics.get('models', {})
+        if models:
+            best_model = metrics.get('best_model', '')
+            if best_model == 'xgboost':
+                recommendations.append(
+                    "XGBoost performed best. Consider hyperparameter tuning for further gains."
+                )
         
         # Default recommendation
         if not recommendations:
@@ -655,45 +582,41 @@ class QuickReportGenerator:
         if not HAS_PLOTTING:
             return ""
         
-        try:
-            fig, ax = plt.subplots(figsize=(10, 6))
-            
-            class_labels = {0: 'Hate Speech', 1: 'Offensive Language', 2: 'Neither'}
-            labels = [class_labels.get(int(k), f"Class {k}") for k in class_dist.keys()]
-            values = list(class_dist.values())
-            
-            colors = sns.color_palette("husl", len(labels))
-            bars = ax.bar(labels, values, color=colors, alpha=0.8)
-            
-            ax.set_ylabel('Number of Samples', fontsize=12)
-            ax.set_title('Class Distribution', fontsize=14, fontweight='bold')
-            ax.grid(axis='y', alpha=0.3)
-            
-            # Add value labels on bars
-            for bar in bars:
-                height = bar.get_height()
-                ax.text(
-                    bar.get_x() + bar.get_width() / 2.,
-                    height,
-                    f'{int(height):,}',
-                    ha='center',
-                    va='bottom',
-                    fontsize=10
-                )
-            
-            plt.tight_layout()
-            
-            # Convert to base64
-            buffer = io.BytesIO()
-            plt.savefig(buffer, format='png', dpi=100, bbox_inches='tight')
-            buffer.seek(0)
-            image_base64 = base64.b64encode(buffer.read()).decode()
-            plt.close(fig)
-            
-            return image_base64
-        except Exception as e:
-            print(f"Warning: Could not create class distribution chart: {e}")
-            return ""
+        fig, ax = plt.subplots(figsize=(10, 6))
+        
+        class_labels = {0: 'Hate Speech', 1: 'Offensive Language', 2: 'Neither'}
+        labels = [class_labels.get(int(k), f"Class {k}") for k in class_dist.keys()]
+        values = list(class_dist.values())
+        
+        colors = sns.color_palette("husl", len(labels))
+        bars = ax.bar(labels, values, color=colors, alpha=0.8)
+        
+        ax.set_ylabel('Number of Samples', fontsize=12)
+        ax.set_title('Class Distribution', fontsize=14, fontweight='bold')
+        ax.grid(axis='y', alpha=0.3)
+        
+        # Add value labels on bars
+        for bar in bars:
+            height = bar.get_height()
+            ax.text(
+                bar.get_x() + bar.get_width() / 2.,
+                height,
+                f'{int(height):,}',
+                ha='center',
+                va='bottom',
+                fontsize=10
+            )
+        
+        plt.tight_layout()
+        
+        # Convert to base64
+        buffer = io.BytesIO()
+        plt.savefig(buffer, format='png', dpi=100, bbox_inches='tight')
+        buffer.seek(0)
+        image_base64 = base64.b64encode(buffer.read()).decode()
+        plt.close(fig)
+        
+        return image_base64
     
     def _create_split_chart(
         self,
@@ -705,102 +628,94 @@ class QuickReportGenerator:
         if not HAS_PLOTTING:
             return ""
         
-        try:
-            fig, ax = plt.subplots(figsize=(8, 6))
-            
-            sizes = [train, val, test]
-            labels = ['Training', 'Validation', 'Test']
-            colors = sns.color_palette("pastel")[0:3]
-            explode = (0.05, 0.05, 0.05)
-            
-            ax.pie(
-                sizes,
-                explode=explode,
-                labels=labels,
-                colors=colors,
-                autopct='%1.1f%%',
-                shadow=True,
-                startangle=90
-            )
-            ax.axis('equal')
-            ax.set_title('Data Split Distribution', fontsize=14, fontweight='bold')
-            
-            plt.tight_layout()
-            
-            # Convert to base64
-            buffer = io.BytesIO()
-            plt.savefig(buffer, format='png', dpi=100, bbox_inches='tight')
-            buffer.seek(0)
-            image_base64 = base64.b64encode(buffer.read()).decode()
-            plt.close(fig)
-            
-            return image_base64
-        except Exception as e:
-            print(f"Warning: Could not create split chart: {e}")
-            return ""
+        fig, ax = plt.subplots(figsize=(8, 6))
+        
+        sizes = [train, val, test]
+        labels = ['Training', 'Validation', 'Test']
+        colors = sns.color_palette("pastel")[0:3]
+        explode = (0.05, 0.05, 0.05)
+        
+        ax.pie(
+            sizes,
+            explode=explode,
+            labels=labels,
+            colors=colors,
+            autopct='%1.1f%%',
+            shadow=True,
+            startangle=90
+        )
+        ax.axis('equal')
+        ax.set_title('Data Split Distribution', fontsize=14, fontweight='bold')
+        
+        plt.tight_layout()
+        
+        # Convert to base64
+        buffer = io.BytesIO()
+        plt.savefig(buffer, format='png', dpi=100, bbox_inches='tight')
+        buffer.seek(0)
+        image_base64 = base64.b64encode(buffer.read()).decode()
+        plt.close(fig)
+        
+        return image_base64
     
     def _create_model_comparison_chart(self, models: Dict) -> str:
         """Create model performance comparison chart as base64 string."""
         if not HAS_PLOTTING:
             return ""
         
-        try:
-            fig, ax = plt.subplots(figsize=(12, 6))
-            
-            model_names = list(models.keys())
-            accuracies = [m.get('accuracy', 0) * 100 for m in models.values()]
-            f1_scores = [m.get('f1_macro', 0) * 100 for m in models.values()]
-            
-            x = range(len(model_names))
-            width = 0.35
-            
-            bars1 = ax.bar(
-                [i - width/2 for i in x],
-                accuracies,
-                width,
-                label='Accuracy',
-                alpha=0.8
-            )
-            bars2 = ax.bar(
-                [i + width/2 for i in x],
-                f1_scores,
-                width,
-                label='F1 Score (Macro)',
-                alpha=0.8
-            )
-            
-            ax.set_xlabel('Models', fontsize=12)
-            ax.set_ylabel('Score (%)', fontsize=12)
-            ax.set_title('Model Performance Comparison', fontsize=14, fontweight='bold')
-            ax.set_xticks(x)
-            ax.set_xticklabels([m.upper() for m in model_names])
-            ax.legend()
-            ax.grid(axis='y', alpha=0.3)
-            ax.set_ylim([0, 100])
-            
-            # Add value labels on bars
-            for bars in [bars1, bars2]:
-                for bar in bars:
-                    height = bar.get_height()
-                    ax.text(
-                        bar.get_x() + bar.get_width() / 2.,
-                        height,
-                        f'{height:.1f}',
-                        ha='center',
-                        va='bottom',
-                        fontsize=9
-                    )
-            
-            plt.tight_layout()
-            
-            # Convert to base64
-            buffer = io.BytesIO()
-            plt.savefig(buffer, format='png', dpi=100, bbox_inches='tight')
-            buffer.seek(0)
-            image_base64 = base64.b64encode(buffer.read()).decode()
-            plt.close(fig)
-            
-            return image_base64
-        except Exception as e:
-            print(f"Warning: Could not create model comparison chart: {e}")
-            return ""
+        fig, ax = plt.subplots(figsize=(12, 6))
+        
+        model_names = list(models.keys())
+        accuracies = [m.get('accuracy', 0) * 100 for m in models.values()]
+        f1_scores = [m.get('f1_macro', 0) * 100 for m in models.values()]
+        
+        x = range(len(model_names))
+        width = 0.35
+        
+        bars1 = ax.bar(
+            [i - width/2 for i in x],
+            accuracies,
+            width,
+            label='Accuracy',
+            alpha=0.8
+        )
+        bars2 = ax.bar(
+            [i + width/2 for i in x],
+            f1_scores,
+            width,
+            label='F1 Score (Macro)',
+            alpha=0.8
+        )
+        
+        ax.set_xlabel('Models', fontsize=12)
+        ax.set_ylabel('Score (%)', fontsize=12)
+        ax.set_title('Model Performance Comparison', fontsize=14, fontweight='bold')
+        ax.set_xticks(x)
+        ax.set_xticklabels([m.upper() for m in model_names])
+        ax.legend()
+        ax.grid(axis='y', alpha=0.3)
+        ax.set_ylim([0, 100])
+        
+        # Add value labels on bars
+        for bars in [bars1, bars2]:
+            for bar in bars:
+                height = bar.get_height()
+                ax.text(
+                    bar.get_x() + bar.get_width() / 2.,
+                    height,
+                    f'{height:.1f}',
+                    ha='center',
+                    va='bottom',
+                    fontsize=9
+                )
+        
+        plt.tight_layout()
+        
+        # Convert to base64
+        buffer = io.BytesIO()
+        plt.savefig(buffer, format='png', dpi=100, bbox_inches='tight')
+        buffer.seek(0)
+        image_base64 = base64.b64encode(buffer.read()).decode()
+        plt.close(fig)
+        
+        return image_base64

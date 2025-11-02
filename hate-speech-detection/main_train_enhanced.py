@@ -1,5 +1,7 @@
 """
 Enhanced Main Training Script - Hate Speech Detection Project
+CORRECTED VERSION with proper reporting integration
+
 Supports:
 1. Training on ALL datasets in data/raw
 2. Incremental training (adding new data to existing models)
@@ -16,6 +18,8 @@ import numpy as np
 from pathlib import Path
 from typing import List, Tuple, Optional
 import joblib
+from datetime import datetime
+
 warnings.filterwarnings('ignore')
 
 # Import all Phase 1-3 modules
@@ -38,6 +42,91 @@ except ImportError:
     logger.warning("Deep learning modules not available. Phase 5 will be skipped.")
 
 from inference.tweet_classifier import TweetClassifier, demo
+
+
+class DualLogger:
+    """Logger that writes to both console and file simultaneously"""
+    
+    def __init__(self, log_file='results/training.log'):
+        self.log_file = Path(log_file)
+        self.log_file.parent.mkdir(parents=True, exist_ok=True)
+        
+        # Initialize log file with header
+        with open(self.log_file, 'w', encoding='utf-8') as f:
+            f.write("=" * 80 + "\n")
+            f.write(f"Training Log - {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
+            f.write("=" * 80 + "\n\n")
+        
+        # Store original stdout and stderr
+        self.original_stdout = sys.stdout
+        self.original_stderr = sys.stderr
+        
+        # Create file handle
+        self.log_handle = open(self.log_file, 'a', encoding='utf-8', buffering=1)
+    
+    def write(self, message):
+        """Write to both console and file"""
+        # Write to console
+        self.original_stdout.write(message)
+        self.original_stdout.flush()
+        
+        # Write to file
+        self.log_handle.write(message)
+        self.log_handle.flush()
+    
+    def flush(self):
+        """Flush both outputs"""
+        self.original_stdout.flush()
+        self.log_handle.flush()
+    
+    def close(self):
+        """Close file handle"""
+        if hasattr(self, 'log_handle'):
+            self.log_handle.close()
+    
+    def __enter__(self):
+        """Context manager entry"""
+        sys.stdout = self
+        sys.stderr = self
+        return self
+    
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        """Context manager exit"""
+        sys.stdout = self.original_stdout
+        sys.stderr = self.original_stderr
+        self.close()
+
+
+def setup_file_logging(log_file='results/training.log'):
+    """
+    Setup file logging for the entire script.
+    Call this at the beginning of main() function.
+    
+    Returns:
+        DualLogger instance (for cleanup later)
+    """
+    dual_logger = DualLogger(log_file)
+    sys.stdout = dual_logger
+    sys.stderr = dual_logger
+    
+    print(f"[LOGGING] Output will be logged to: {dual_logger.log_file.absolute()}\n")
+    
+    return dual_logger
+
+
+def cleanup_file_logging(dual_logger):
+    """
+    Cleanup file logging.
+    Call this at the end of main() function or in a finally block.
+    """
+    if dual_logger:
+        sys.stdout = dual_logger.original_stdout
+        sys.stderr = dual_logger.original_stderr
+        dual_logger.close()
+        print(f"\n[LOGGING] Training log saved to: {dual_logger.log_file.absolute()}")
+
+
+
 
 # ==================== DATASET LOADING ====================
 
@@ -106,7 +195,7 @@ def load_all_csv_datasets(data_dir: Path = RAW_DATA_DIR, exclude: List[str] = No
         raise ValueError("No valid datasets could be loaded!")
     
     # Combine all dataframes
-    logger.info(f"\n[INFO] Combining {len(all_dataframes)} dataset(s)...")
+    logger.info(f"\n[COMBINE] Combining {len(all_dataframes)} dataset(s)...")
     combined_df = pd.concat(all_dataframes, ignore_index=True)
     
     # Remove duplicates
@@ -120,14 +209,14 @@ def load_all_csv_datasets(data_dir: Path = RAW_DATA_DIR, exclude: List[str] = No
     logger.info(f"\n[SUCCESS] Total combined dataset: {len(combined_df):,} rows")
     
     # Print dataset breakdown
-    print("\n[DATASET BREAKDOWN]")
+    print("\n[BREAKDOWN] Dataset Breakdown:")
     for source in combined_df['source_file'].unique():
         count = len(combined_df[combined_df['source_file'] == source])
         percentage = (count / len(combined_df)) * 100
         logger.info(f"  {source:30s}: {count:8,} ({percentage:5.2f}%)")
     
     # Print class distribution
-    print("\n[CLASS DISTRIBUTION]")
+    print("\n[DISTRIBUTION] Class Distribution:")
     for class_id in sorted(combined_df['class'].unique()):
         count = len(combined_df[combined_df['class'] == class_id])
         percentage = (count / len(combined_df)) * 100
@@ -234,15 +323,15 @@ class IncrementalTrainer:
             logger.info(f"  [NEW] {ds}")
         
         if not new_datasets:
-            logger.warning("[WARNING] No new datasets found! Nothing to do.")
+            logger.warning("[WARN] No new datasets found! Nothing to do.")
             return None
         
         # Decide what to load
         if new_datasets_only:
-            logger.info(f"\n[INFO] Loading ONLY new datasets: {new_datasets}")
+            logger.info(f"\n[LOAD] Loading ONLY new datasets: {new_datasets}")
             exclude = trained_datasets
         else:
-            logger.info(f"\n[INFO] Loading ALL datasets (new + previously trained)")
+            logger.info(f"\n[LOAD] Loading ALL datasets (new + previously trained)")
             exclude = []
         
         # Load data
@@ -505,7 +594,7 @@ def phase1_train_traditional_ml(
                 
                 # Validate metrics
                 if not collector.validate():
-                    logger.warning("[WARNING] Metrics validation failed - some data may be missing")
+                    logger.warning("[WARN] Metrics validation failed - some data may be missing")
                 else:
                     logger.info("[OK] Metrics validated successfully")
                 
@@ -533,7 +622,7 @@ def phase1_train_traditional_ml(
                 
                 print("\n" + "=" * 80)
                 logger.info("[SUCCESS] TRAINING REPORT GENERATED SUCCESSFULLY!")
-                logger.info(f"[REPORT] Report location: {report_path}")
+                logger.info(f"[FILE] Report location: {report_path}")
                 logger.info(f"[BROWSER] Open in browser: file://{report_path.absolute()}")
                 print("=" * 80 + "\n")
                 
@@ -589,7 +678,7 @@ def main(
         logger.error("Please place dataset files in data/raw/ directory")
         sys.exit(1)
     
-    logger.info(f"[OK] Found {len(csv_files)} CSV file(s) in data/raw/:")
+    logger.info(f"[SUCCESS] Found {len(csv_files)} CSV file(s) in data/raw/:")
     for csv_file in csv_files:
         logger.info(f"  [FILE] {csv_file.name}")
     
@@ -606,7 +695,7 @@ def main(
             from main_train import phase4_test_severity_system
             phase4_success = phase4_test_severity_system()
         except ImportError:
-            logger.warning("[WARNING] Could not import phase4_test_severity_system")
+            logger.warning("[WARN] Could not import phase4_test_severity_system")
             phase4_success = None
     else:
         logger.info("[SKIP] Skipping Phase 4 (Severity System)")
@@ -618,7 +707,7 @@ def main(
             from main_train import phase5_train_deep_learning
             trainer_dl = phase5_train_deep_learning(use_bert=use_bert)
         except ImportError:
-            logger.warning("[WARNING] Could not import phase5_train_deep_learning")
+            logger.warning("[WARN] Could not import phase5_train_deep_learning")
             trainer_dl = None
     else:
         logger.info("\n[SKIP] Skipping Phase 5 (Deep Learning)")
@@ -631,14 +720,14 @@ def main(
             from inference.tweet_classifier import demo
             demo()
         except Exception as e:
-            logger.warning(f"[WARNING] Could not run classifier demo: {e}")
+            logger.warning(f"[WARN] Could not run classifier demo: {e}")
     
     # Final summary
     print("\n" + "=" * 80)
     print("[SUCCESS] TRAINING PIPELINE COMPLETE")
     print("=" * 80)
     
-    print("\n[COMPLETED PHASES]")
+    print("\n[COMPLETED] Completed Phases:")
     if not skip_phase1:
         print("  [OK] Phase 1-3: Traditional ML + Embeddings")
         if trainer_trad:
@@ -653,7 +742,7 @@ def main(
     if run_phase5 and trainer_dl:
         print("  [OK] Phase 5: Deep Learning Models")
     
-    print("\n[OUTPUT LOCATIONS]")
+    print("\n[OUTPUT] Output Locations:")
     print(f"  Models: {PROJECT_ROOT / 'saved_models'}")
     print(f"  Features: {PROJECT_ROOT / 'saved_features'}")
     print(f"  Results: {PROJECT_ROOT / 'results'}")
@@ -662,11 +751,11 @@ def main(
     if incremental:
         trainer = IncrementalTrainer()
         trained = trainer.get_trained_datasets()
-        print(f"\n[TRAINED DATASETS] ({len(trained)})")
+        print(f"\n[TRAINED] Trained Datasets ({len(trained)}):")
         for ds in trained:
             print(f"  [OK] {ds}")
     
-    print("\n[NEXT STEPS]")
+    print("\n[NEXT] Next Steps:")
     print("  1. View training report in results/training_reports/")
     print("  2. Use the classifier:")
     print("     from inference.tweet_classifier import TweetClassifier")
@@ -723,7 +812,7 @@ Step 2: Add dataset2.csv to data/raw/
 Step 3: Incremental training (adds only dataset2.csv)
    $ python main_train_enhanced.py --incremental
    [OK] Loads: dataset2.csv (NEW)
-   [SKIP] Skips: labeled_data.csv (already trained)
+   [OK] Skips: labeled_data.csv (already trained)
    [OK] Updates models with new data
    [OK] Updates: trained_datasets.txt
 
@@ -731,7 +820,7 @@ Step 4: Add dataset3.csv
    $ cp dataset3.csv data/raw/
    $ python main_train_enhanced.py --incremental
    [OK] Loads: dataset3.csv (NEW)
-   [SKIP] Skips: labeled_data.csv, dataset2.csv (already trained)
+   [OK] Skips: labeled_data.csv, dataset2.csv (already trained)
 
 DATASET FORMAT:
 ===============
@@ -782,7 +871,7 @@ if __name__ == "__main__":
     if args.usage:
         print_usage()
     elif args.list_datasets:
-        print("\n[DATASETS IN data/raw/]")
+        print("\n[DATASETS] Datasets in data/raw/:")
         print("=" * 60)
         csv_files = list(RAW_DATA_DIR.glob('*.csv'))
         if not csv_files:
@@ -796,14 +885,16 @@ if __name__ == "__main__":
         trainer = IncrementalTrainer()
         trained = trainer.get_trained_datasets()
         if trained:
-            print(f"\n[ALREADY TRAINED ON] ({len(trained)})")
+            print(f"\n[TRAINED] Already trained on ({len(trained)}):")
             for ds in trained:
                 print(f"  [OK] {ds}")
     else:
-        main(
-            skip_phase1=args.skip_phase1,
-            skip_phase4=args.skip_phase4,
-            run_phase5=args.phase5,
-            use_bert=args.use_bert,
-            incremental=args.incremental and not args.retrain
-        )
+        # Enable file logging for training
+        with DualLogger('results/training.log'):
+            main(
+                skip_phase1=args.skip_phase1,
+                skip_phase4=args.skip_phase4,
+                run_phase5=args.phase5,
+                use_bert=args.use_bert,
+                incremental=args.incremental and not args.retrain
+            )

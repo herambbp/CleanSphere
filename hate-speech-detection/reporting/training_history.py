@@ -1,6 +1,7 @@
 """
 Training History Management System
 Stores and queries historical training run data in JSON format
+CORRECTED VERSION with get_previous_run method
 """
 
 import json
@@ -126,6 +127,17 @@ class TrainingHistory:
         if not self.runs:
             return None
         return self.runs[-1]
+    
+    def get_previous_run(self) -> Optional[Dict]:
+        """
+        Get the second most recent training run (for comparison with current)
+        
+        Returns:
+            Dictionary with run data, or None if fewer than 2 runs exist
+        """
+        if len(self.runs) < 2:
+            return None
+        return self.runs[-2]
     
     def get_run_by_id(self, run_id: str) -> Optional[Dict]:
         """

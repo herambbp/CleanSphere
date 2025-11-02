@@ -1,0 +1,1209 @@
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\config.py:10-10:
+import re
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\config.py:11-11:
+from pathlib import Path
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\csv_processor.py:13-13:
+import pandas as pd
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\csv_processor.py:14-14:
+import numpy as np
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\csv_processor.py:15-15:
+from typing import Dict, List, Tuple
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\csv_processor.py:16-16:
+from datetime import datetime
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\csv_processor.py:17-17:
+from pathlib import Path
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\csv_processor.py:18-18:
+import warnings
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\csv_processor.py:21-21:
+from inference.explainable_classifier import ExplainableTweetClassifier
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\csv_processor.py:22-22:
+from config import CLASS_LABELS, SEVERITY_LEVELS
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\csv_processor.py:23-23:
+from utils import logger
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\csv_processor.py:484-484:
+        import json
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\data_handler.py:5-5:
+import pandas as pd
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\data_handler.py:6-6:
+import numpy as np
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\data_handler.py:7-7:
+from sklearn.model_selection import train_test_split
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\data_handler.py:8-8:
+import joblib
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\data_handler.py:9-9:
+from typing import Tuple, Optional
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\data_handler.py:10-10:
+import warnings
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\data_handler.py:13-16:
+from config import (
+    LABELED_DATA_CSV, COMBINED_DATA_CSV, PROCESSED_DATA_DIR,
+    TRAIN_RATIO, VAL_RATIO, TEST_RATIO, RANDOM_STATE, CLASS_LABELS
+)
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\data_handler.py:17-17:
+from utils import logger, print_section_header, print_class_distribution, validate_arrays
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\data_handler.py:392-392:
+        import traceback
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\embedding_trainer.py:5-5:
+import numpy as np
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\embedding_trainer.py:6-6:
+import joblib
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\embedding_trainer.py:7-7:
+from typing import List
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\embedding_trainer.py:8-8:
+import warnings
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\embedding_trainer.py:11-11:
+from config import WORD2VEC_CONFIG, FASTTEXT_CONFIG, FEATURE_FILES
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\embedding_trainer.py:12-12:
+from text_preprocessor import tokenize_for_word2vec
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\embedding_trainer.py:13-13:
+from utils import logger, print_section_header, ProgressTracker
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\embedding_trainer.py:17-17:
+    from gensim.models import Word2Vec, FastText
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\feature_extractor.py:6-6:
+import numpy as np
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\feature_extractor.py:7-7:
+import re
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\feature_extractor.py:8-8:
+import joblib
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\feature_extractor.py:9-9:
+from sklearn.feature_extraction.text import TfidfVectorizer
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\feature_extractor.py:10-10:
+from sklearn.preprocessing import StandardScaler
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\feature_extractor.py:11-11:
+from typing import List, Tuple
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\feature_extractor.py:12-12:
+import warnings
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\feature_extractor.py:15-19:
+from config import (
+    TFIDF_CHAR_CONFIG, TFIDF_WORD_CONFIG,
+    URL_PATTERN, HASHTAG_PATTERN, MENTION_PATTERN,
+    FEATURE_FILES, VIOLENCE_KEYWORDS, FEATURE_COMBINATION
+)
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\feature_extractor.py:20-20:
+from text_preprocessor import get_standard_preprocessor, tokenize_for_word2vec
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\feature_extractor.py:21-21:
+from utils import logger, ProgressTracker
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\feature_extractor.py:25-25:
+    from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\feature_extractor.py:32-32:
+    import textstat
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\fix_tokenizer.py:4-4:
+import joblib
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\fix_tokenizer.py:5-5:
+from pathlib import Path
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\fix_tokenizer.py:6-6:
+from tensorflow.keras.preprocessing.text import tokenizer_from_json
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\fix_tokenizer.py:7-7:
+import json
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\fix_tokenizer.py:30-30:
+from tensorflow.keras.preprocessing.text import Tokenizer
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\fix_tokenizer.py:46-46:
+from models.deep_learning.text_tokenizer import TextTokenizer
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\fix_tokenizer.py:66-66:
+    import traceback
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\main.py:17-17:
+from fastapi import FastAPI, HTTPException, BackgroundTasks, status, File, UploadFile
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\main.py:18-18:
+from fastapi.middleware.cors import CORSMiddleware
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\main.py:19-19:
+from fastapi.responses import JSONResponse, FileResponse
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\main.py:20-20:
+from pydantic import BaseModel, Field, validator
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\main.py:21-21:
+from typing import List, Optional, Dict, Any
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\main.py:22-22:
+from datetime import datetime
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\main.py:23-23:
+from pathlib import Path
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\main.py:24-24:
+import tempfile
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\main.py:25-25:
+import shutil
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\main.py:26-26:
+import logging
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\main.py:27-27:
+import sys
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\main.py:28-28:
+import pandas as pd
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\main.py:29-29:
+import numpy as np
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\main.py:30-30:
+import os
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\main.py:31-31:
+import json
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\main.py:45-49:
+from inference.explainable_classifier import (
+    ExplainableTweetClassifier,
+    classify_with_explanation,
+    get_explanation_summary
+)
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\main.py:50-50:
+from config import CLASS_LABELS, SEVERITY_LEVELS
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\main.py:35-35:
+    from openai import OpenAI
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\main.py:54-54:
+    from csv_processor import CSVProcessor
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\main.py:761-761:
+    import uvicorn
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\main_test.py:8-8:
+from typing import Dict, Any, List
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\main_test.py:9-9:
+from inference.explainable_classifier import ExplainableTweetClassifier
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\main_train.py:10-10:
+import sys
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\main_train.py:11-11:
+import warnings
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\main_train.py:15-15:
+from config import PROJECT_ROOT, FEATURE_COMBINATION
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\main_train.py:16-16:
+from utils import logger, print_section_header
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\main_train.py:17-17:
+from data_handler import load_and_split_data
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\main_train.py:18-18:
+from feature_extractor import FeatureExtractor
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\main_train.py:19-19:
+from embedding_trainer import train_embeddings, HAS_GENSIM
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\main_train.py:20-20:
+from models.traditional_ml_trainer import train_traditional_models
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\main_train.py:31-31:
+from inference.tweet_classifier import TweetClassifier, demo
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\main_train.py:24-24:
+    from models.deep_learning_trainer import train_deep_learning_models, HAS_TENSORFLOW
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\main_train.py:603-603:
+    from config import LABELED_DATA_CSV, COMBINED_DATA_CSV
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\main_train.py:775-775:
+    import argparse
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\main_train.py:188-188:
+        from severity.severity_classifier import SeverityScorer
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\main_train.py:189-189:
+        from severity.action_recommender import ActionRecommender
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\main_train.py:427-427:
+        from data_handler import DataSplitter
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\main_train.py:166-166:
+        import traceback
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\main_train.py:481-481:
+            import json
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\main_train.py:482-482:
+            import pandas as pd
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\main_train.py:483-483:
+            from config import RESULTS_DIR, COMPARISON_FILE, DL_COMPARISON_FILE
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\main_train_enhanced.py:12-12:
+import sys
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\main_train_enhanced.py:13-13:
+import warnings
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\main_train_enhanced.py:14-14:
+import pandas as pd
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\main_train_enhanced.py:15-15:
+import numpy as np
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\main_train_enhanced.py:16-16:
+from pathlib import Path
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\main_train_enhanced.py:17-17:
+from typing import List, Tuple, Optional
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\main_train_enhanced.py:18-18:
+import joblib
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\main_train_enhanced.py:22-22:
+from config import PROJECT_ROOT, FEATURE_COMBINATION, RAW_DATA_DIR, MODELS_DIR
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\main_train_enhanced.py:23-23:
+from utils import logger, print_section_header
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\main_train_enhanced.py:24-24:
+from data_handler import DataSplitter
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\main_train_enhanced.py:25-25:
+from feature_extractor import FeatureExtractor
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\main_train_enhanced.py:26-26:
+from embedding_trainer import train_embeddings, HAS_GENSIM
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\main_train_enhanced.py:27-27:
+from models.traditional_ml_trainer import train_traditional_models
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\main_train_enhanced.py:28-28:
+from reporting import TrainingHistory, MetricsCollector, QuickReportGenerator
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\main_train_enhanced.py:40-40:
+from inference.tweet_classifier import TweetClassifier, demo
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\main_train_enhanced.py:33-33:
+    from models.deep_learning_trainer import train_deep_learning_models, HAS_TENSORFLOW
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\main_train_enhanced.py:696-696:
+    import argparse
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\main_train_enhanced.py:134-134:
+        from config import CLASS_LABELS
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\main_train_enhanced.py:498-498:
+        import traceback
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\main_train_enhanced.py:554-554:
+            from main_train import phase4_test_severity_system
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\main_train_enhanced.py:566-566:
+            from main_train import phase5_train_deep_learning
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\main_train_enhanced.py:579-579:
+            from inference.tweet_classifier import demo
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\main_train_enhanced.py:491-491:
+                import traceback
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\make_requirements.py:20-20:
+from __future__ import annotations
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\make_requirements.py:21-21:
+import argparse
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\make_requirements.py:22-22:
+import ast
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\make_requirements.py:23-23:
+import os
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\make_requirements.py:24-24:
+import sys
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\make_requirements.py:25-25:
+import sysconfig
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\make_requirements.py:26-26:
+import importlib.util
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\make_requirements.py:27-27:
+from pathlib import Path
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\make_requirements.py:28-28:
+from typing import Set, Dict
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\make_requirements.py:32-32:
+    import importlib.metadata as importlib_metadata
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\make_requirements.py:35-35:
+        import importlib_metadata  # type: ignore
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\report_generator.py:6-6:
+import numpy as np
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\report_generator.py:7-7:
+import pandas as pd
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\report_generator.py:8-8:
+import matplotlib.pyplot as plt
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\report_generator.py:9-9:
+import seaborn as sns
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\report_generator.py:10-10:
+from pathlib import Path
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\report_generator.py:11-11:
+from datetime import datetime
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\report_generator.py:12-12:
+from typing import Dict, List, Tuple, Optional, Any
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\report_generator.py:13-13:
+import json
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\report_generator.py:14-14:
+import joblib
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\report_generator.py:15-15:
+import warnings
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\report_generator.py:18-22:
+from sklearn.metrics import (
+    accuracy_score, precision_score, recall_score, f1_score,
+    confusion_matrix, classification_report, roc_curve, auc,
+    precision_recall_curve, matthews_corrcoef, cohen_kappa_score
+)
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\report_generator.py:23-23:
+from sklearn.preprocessing import label_binarize
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\report_generator.py:25-25:
+import logging
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\report_generator.py:1048-1048:
+        from pathlib import Path
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\report_generator.py:1049-1049:
+        import joblib
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\scrape_import_lines.py:24-24:
+from __future__ import annotations
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\scrape_import_lines.py:25-25:
+import argparse
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\scrape_import_lines.py:26-26:
+import ast
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\scrape_import_lines.py:27-27:
+import os
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\scrape_import_lines.py:28-28:
+import sys
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\scrape_import_lines.py:29-29:
+from pathlib import Path
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\scrape_import_lines.py:30-30:
+from typing import List, Tuple, Set
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\test_csv_feature.py:6-6:
+import sys
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\test_csv_feature.py:7-7:
+from pathlib import Path
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\test_csv_feature.py:16-16:
+    from csv_processor import CSVProcessor
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\test_csv_feature.py:26-26:
+    from inference.explainable_classifier import ExplainableTweetClassifier
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\test_csv_feature.py:40-40:
+    import pandas as pd
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\test_csv_feature.py:110-110:
+    from fastapi import FastAPI
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\test_csv_feature.py:66-66:
+    import traceback
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\test_metrics_collector.py:6-6:
+import sys
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\test_metrics_collector.py:7-7:
+import os
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\test_metrics_collector.py:8-8:
+import time
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\test_metrics_collector.py:13-13:
+from reporting.metrics_collector import MetricsCollector
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\test_metrics_collector.py:374-374:
+    from reporting.training_history import TrainingHistory
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\test_metrics_collector.py:375-375:
+    import tempfile
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\test_metrics_collector.py:376-376:
+    import shutil
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\test_metrics_collector.py:453-453:
+            import traceback
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\test_quick_report_generator.py:6-6:
+import sys
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\test_quick_report_generator.py:7-7:
+import unittest
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\test_quick_report_generator.py:8-8:
+from pathlib import Path
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\test_quick_report_generator.py:9-9:
+from datetime import datetime
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\test_quick_report_generator.py:14-14:
+from reporting.quick_report_generator import QuickReportGenerator
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\test_quick_report_generator.py:74-74:
+        import shutil
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\test_training_history.py:6-6:
+import sys
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\test_training_history.py:7-7:
+import os
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\test_training_history.py:8-8:
+import json
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\test_training_history.py:9-9:
+from pathlib import Path
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\test_training_history.py:10-10:
+import tempfile
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\test_training_history.py:11-11:
+import shutil
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\test_training_history.py:16-16:
+from reporting.training_history import TrainingHistory
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\test_xai_installation.py:22-22:
+import importlib
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\test_xai_installation.py:23-23:
+import importlib.metadata
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\test_xai_installation.py:24-24:
+import pkg_resources
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\test_xai_installation.py:25-25:
+import lime
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\test_xai_installation.py:8-8:
+    from explainability.explainability_engine import ComprehensiveExplainer, KeywordExplainer
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\test_xai_installation.py:14-14:
+    from inference.explainable_classifier import ExplainableTweetClassifier
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\test_xai_installation.py:49-49:
+    import shap
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\test_xai_installation.py:57-57:
+    from explainability.explainability_engine import KeywordExplainer
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\text_preprocessor.py:6-6:
+import re
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\text_preprocessor.py:7-7:
+import string
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\text_preprocessor.py:8-8:
+import nltk
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\text_preprocessor.py:9-9:
+from nltk.stem.porter import PorterStemmer
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\text_preprocessor.py:10-10:
+from nltk.corpus import stopwords
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\text_preprocessor.py:11-11:
+from typing import List
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\text_preprocessor.py:12-12:
+import warnings
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\text_preprocessor.py:15-20:
+from config import (
+    URL_PATTERN, MENTION_PATTERN, HASHTAG_PATTERN, EMAIL_PATTERN, 
+    PHONE_PATTERN, SPACE_PATTERN, REPEATED_CHAR_PATTERN,
+    URL_TOKEN, MENTION_TOKEN, EMAIL_TOKEN, PHONE_TOKEN,
+    CUSTOM_STOPWORDS, CONTRACTIONS
+)
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\text_preprocessor.py:21-21:
+from utils import logger
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\timepass.py:5-5:
+from inference.tweet_classifier import TweetClassifier
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\timepass.py:6-6:
+import sys
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\utils.py:5-5:
+import logging
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\utils.py:6-6:
+import sys
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\utils.py:7-7:
+import numpy as np
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\utils.py:8-8:
+import pandas as pd
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\utils.py:9-9:
+from pathlib import Path
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\utils.py:10-10:
+from datetime import datetime
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\utils.py:11-14:
+from sklearn.metrics import (
+    accuracy_score, precision_score, recall_score, f1_score,
+    confusion_matrix, classification_report
+)
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\utils.py:15-15:
+from typing import Dict, List
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\utils.py:16-16:
+import warnings
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\utils.py:19-19:
+from config import LOGS_DIR, LOG_FORMAT, LOG_DATE_FORMAT, CLASS_LABELS
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\utils.py:370-370:
+    import json
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\utils.py:371-371:
+    from config import RESULTS_DIR
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\explainability\explainability_engine.py:13-13:
+import numpy as np
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\explainability\explainability_engine.py:14-14:
+import pandas as pd
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\explainability\explainability_engine.py:15-15:
+from typing import Dict, List, Tuple, Optional, Union
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\explainability\explainability_engine.py:16-16:
+import warnings
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\explainability\explainability_engine.py:19-23:
+from config import (
+    CLASS_LABELS, LIME_CONFIG, SHAP_CONFIG,
+    VIOLENCE_KEYWORDS, THREAT_PATTERNS, DEHUMANIZATION_KEYWORDS,
+    RACIAL_SLURS, LGBTQ_SLURS, SEXIST_SLURS, RELIGIOUS_SLURS, ABLEIST_SLURS
+)
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\explainability\explainability_engine.py:24-24:
+from utils import logger
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\explainability\explainability_engine.py:28-28:
+    from lime.lime_text import LimeTextExplainer
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\explainability\explainability_engine.py:36-36:
+    import shap
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\explainability\__init__.py:5-12:
+from .explainability_engine import (
+    ComprehensiveExplainer,
+    KeywordExplainer,
+    LIMEExplainer,
+    FeatureImportanceExplainer,
+    create_explainer,
+    explain_prediction
+)
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\inference\explainable_classifier.py:12-12:
+import sys
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\inference\explainable_classifier.py:15-15:
+from typing import Dict, List, Optional
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\inference\explainable_classifier.py:16-16:
+import warnings
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\inference\explainable_classifier.py:19-19:
+from inference.tweet_classifier import TweetClassifier
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\inference\explainable_classifier.py:20-26:
+from explainability.explainability_engine import (
+    ComprehensiveExplainer,
+    KeywordExplainer,
+    LIMEExplainer,
+    FeatureImportanceExplainer,
+    HAS_LIME
+)
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\inference\explainable_classifier.py:27-27:
+from config import CLASS_LABELS
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\inference\explainable_classifier.py:28-28:
+from utils import logger
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\inference\tweet_classifier.py:10-10:
+import numpy as np
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\inference\tweet_classifier.py:11-11:
+import joblib
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\inference\tweet_classifier.py:12-12:
+from pathlib import Path
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\inference\tweet_classifier.py:13-13:
+from typing import List, Dict, Union, Optional
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\inference\tweet_classifier.py:14-14:
+import warnings
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\inference\tweet_classifier.py:17-17:
+from config import MODEL_FILES, CLASS_LABELS, RESULTS_DIR
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\inference\tweet_classifier.py:18-18:
+from utils import logger, print_section_header, load_results
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\inference\tweet_classifier.py:910-910:
+    import sys
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\inference\tweet_classifier.py:153-153:
+            from feature_extractor import FeatureExtractor
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\inference\tweet_classifier.py:167-167:
+            from models.deep_learning.text_tokenizer import TextTokenizer
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\inference\tweet_classifier.py:739-739:
+        import traceback
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\inference\tweet_classifier.py:208-208:
+            import traceback
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\inference\tweet_classifier.py:249-249:
+                from models.deep_learning.bert_model import BERTModel
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\inference\tweet_classifier.py:250-250:
+                from config import BERT_CONFIG
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\inference\tweet_classifier.py:454-454:
+                from severity.severity_classifier import SeverityScorer
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\inference\tweet_classifier.py:455-455:
+                from severity.action_recommender import ActionRecommender
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\inference\tweet_classifier.py:256-256:
+                from models.deep_learning.cnn_model import CNNModel
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\inference\tweet_classifier.py:257-257:
+                from config import CNN_CONFIG
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\inference\tweet_classifier.py:263-263:
+                import tensorflow as tf
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\inference\tweet_classifier.py:271-271:
+                from models.deep_learning.bilstm_model import BiLSTMModel
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\inference\tweet_classifier.py:272-272:
+                from config import BILSTM_CONFIG
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\inference\tweet_classifier.py:285-285:
+                from models.deep_learning.lstm_model import LSTMModel
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\inference\tweet_classifier.py:286-286:
+                from config import LSTM_CONFIG
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\inference\__init__.py:2-5:
+from .explainable_classifier import (
+    ExplainableTweetClassifier,
+    classify_with_explanation
+)
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\models\deep_learning_trainer.py:14-14:
+import numpy as np
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\models\deep_learning_trainer.py:15-15:
+import time
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\models\deep_learning_trainer.py:16-16:
+import sys
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\models\deep_learning_trainer.py:17-17:
+from typing import Dict, List, Tuple, Optional
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\models\deep_learning_trainer.py:18-18:
+import warnings
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\models\deep_learning_trainer.py:28-32:
+from config import (
+    LSTM_CONFIG, BILSTM_CONFIG, CNN_CONFIG, BERT_CONFIG,
+    MODEL_FILES, DL_COMPARISON_FILE, RESULTS_DIR,
+    USE_GPU
+)
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\models\deep_learning_trainer.py:33-36:
+from utils import (
+    logger, print_section_header, print_subsection_header,
+    ModelEvaluator, format_time, save_results
+)
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\models\deep_learning_trainer.py:23-23:
+    import tensorflow as tf
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\models\deep_learning_trainer.py:40-40:
+    from models.deep_learning.text_tokenizer import TextTokenizer
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\models\deep_learning_trainer.py:41-41:
+    from models.deep_learning.lstm_model import LSTMModel
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\models\deep_learning_trainer.py:42-42:
+    from models.deep_learning.bilstm_model import BiLSTMModel
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\models\deep_learning_trainer.py:43-43:
+    from models.deep_learning.cnn_model import CNNModel
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\models\deep_learning_trainer.py:47-47:
+        from models.deep_learning.bert_model import BERTModel
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\models\deep_learning_trainer.py:819-819:
+        import json
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\models\deep_learning_trainer.py:391-391:
+            import traceback
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\models\traditional_ml_trainer.py:6-6:
+import numpy as np
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\models\traditional_ml_trainer.py:7-7:
+import joblib
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\models\traditional_ml_trainer.py:8-8:
+import time
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\models\traditional_ml_trainer.py:9-9:
+from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\models\traditional_ml_trainer.py:10-10:
+from sklearn.svm import SVC
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\models\traditional_ml_trainer.py:11-11:
+from sklearn.neural_network import MLPClassifier
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\models\traditional_ml_trainer.py:12-12:
+import warnings
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\models\traditional_ml_trainer.py:15-19:
+from config import (
+    RANDOM_FOREST_CONFIG, XGBOOST_CONFIG, SVM_CONFIG,
+    GRADIENT_BOOST_CONFIG, MLP_CONFIG, SVM_MAX_SAMPLES,
+    MODEL_FILES, METADATA_FILE, COMPARISON_FILE, CLASS_WEIGHTS_LIST, CLASS_WEIGHTS
+)
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\models\traditional_ml_trainer.py:20-23:
+from utils import (
+    logger, print_section_header, ModelEvaluator,
+    get_classification_report, save_results
+)
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\models\traditional_ml_trainer.py:27-27:
+    from xgboost import XGBClassifier
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\models\traditional_ml_trainer.py:82-82:
+        from config import CLASS_WEIGHTS
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\models\traditional_ml_trainer.py:177-177:
+            import traceback
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\models\traditional_ml_trainer.py:275-275:
+                from config import TRADITIONAL_ML_DIR
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\models\deep_learning\bert_model.py:15-15:
+import numpy as np
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\models\deep_learning\bert_model.py:16-16:
+import time
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\models\deep_learning\bert_model.py:17-17:
+from typing import Tuple, Dict, List
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\models\deep_learning\bert_model.py:18-18:
+import warnings
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\models\deep_learning\bert_model.py:19-19:
+from utils import logger
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\models\deep_learning\bert_model.py:41-44:
+from config import (
+    BERT_CONFIG, NUM_CLASSES, MODEL_FILES,
+    EARLY_STOPPING_CONFIG, USE_EARLY_STOPPING, CLASS_WEIGHTS
+)
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\models\deep_learning\bert_model.py:24-24:
+    import tensorflow as tf
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\models\deep_learning\bert_model.py:25-25:
+    from tensorflow import keras
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\models\deep_learning\bert_model.py:32-36:
+    from transformers import (
+        BertTokenizer,
+        TFBertForSequenceClassification,
+        create_optimizer
+    )
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\models\deep_learning\bert_model.py:365-368:
+        from sklearn.metrics import (
+            accuracy_score, precision_score, recall_score,
+            f1_score, classification_report
+        )
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\models\deep_learning\bert_model.py:383-383:
+            from config import CLASS_LABELS
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\models\deep_learning\bilstm_model.py:14-14:
+import numpy as np
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\models\deep_learning\bilstm_model.py:15-15:
+import time
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\models\deep_learning\bilstm_model.py:16-16:
+from typing import Tuple, Dict, List
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\models\deep_learning\bilstm_model.py:17-17:
+import warnings
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\models\deep_learning\bilstm_model.py:30-34:
+from config import (
+    BILSTM_CONFIG, NUM_CLASSES, MODEL_FILES,
+    EARLY_STOPPING_CONFIG, MODEL_CHECKPOINT_CONFIG,
+    USE_EARLY_STOPPING, USE_MODEL_CHECKPOINT, CLASS_WEIGHTS
+)
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\models\deep_learning\bilstm_model.py:21-21:
+    import tensorflow as tf
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\models\deep_learning\bilstm_model.py:22-22:
+    from tensorflow import keras
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\models\deep_learning\bilstm_model.py:23-23:
+    from tensorflow.keras import layers
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\models\deep_learning\bilstm_model.py:24-24:
+    from tensorflow.keras.models import Model, load_model
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\models\deep_learning\bilstm_model.py:25-25:
+    from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint, ReduceLROnPlateau
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\models\deep_learning\bilstm_model.py:310-313:
+        from sklearn.metrics import (
+            accuracy_score, precision_score, recall_score,
+            f1_score, classification_report
+        )
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\models\deep_learning\bilstm_model.py:328-328:
+            from config import CLASS_LABELS
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\models\deep_learning\bilstm_model.py:428-428:
+            import matplotlib.pyplot as plt
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\models\deep_learning\cnn_model.py:16-16:
+import numpy as np
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\models\deep_learning\cnn_model.py:17-17:
+import time
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\models\deep_learning\cnn_model.py:18-18:
+from typing import Tuple, Dict, List
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\models\deep_learning\cnn_model.py:19-19:
+import warnings
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\models\deep_learning\cnn_model.py:32-36:
+from config import (
+    CNN_CONFIG, NUM_CLASSES, MODEL_FILES,
+    EARLY_STOPPING_CONFIG, MODEL_CHECKPOINT_CONFIG,
+    USE_EARLY_STOPPING, USE_MODEL_CHECKPOINT, CLASS_WEIGHTS
+)
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\models\deep_learning\cnn_model.py:23-23:
+    import tensorflow as tf
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\models\deep_learning\cnn_model.py:24-24:
+    from tensorflow import keras
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\models\deep_learning\cnn_model.py:25-25:
+    from tensorflow.keras import layers
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\models\deep_learning\cnn_model.py:26-26:
+    from tensorflow.keras.models import Model, load_model
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\models\deep_learning\cnn_model.py:27-27:
+    from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint, ReduceLROnPlateau
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\models\deep_learning\cnn_model.py:326-329:
+        from sklearn.metrics import (
+            accuracy_score, precision_score, recall_score,
+            f1_score, classification_report
+        )
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\models\deep_learning\cnn_model.py:344-344:
+            from config import CLASS_LABELS
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\models\deep_learning\cnn_model.py:445-445:
+            import matplotlib.pyplot as plt
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\models\deep_learning\lstm_model.py:12-12:
+import numpy as np
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\models\deep_learning\lstm_model.py:13-13:
+import time
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\models\deep_learning\lstm_model.py:14-14:
+from typing import Tuple, Dict, List
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\models\deep_learning\lstm_model.py:15-15:
+import warnings
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\models\deep_learning\lstm_model.py:28-32:
+from config import (
+    LSTM_CONFIG, NUM_CLASSES, MODEL_FILES,
+    EARLY_STOPPING_CONFIG, MODEL_CHECKPOINT_CONFIG,
+    USE_EARLY_STOPPING, USE_MODEL_CHECKPOINT, CLASS_WEIGHTS
+)
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\models\deep_learning\lstm_model.py:19-19:
+    import tensorflow as tf
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\models\deep_learning\lstm_model.py:20-20:
+    from tensorflow import keras
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\models\deep_learning\lstm_model.py:21-21:
+    from tensorflow.keras import layers
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\models\deep_learning\lstm_model.py:22-22:
+    from tensorflow.keras.models import Model, load_model
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\models\deep_learning\lstm_model.py:23-23:
+    from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint, ReduceLROnPlateau
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\models\deep_learning\lstm_model.py:299-302:
+        from sklearn.metrics import (
+            accuracy_score, precision_score, recall_score,
+            f1_score, classification_report
+        )
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\models\deep_learning\lstm_model.py:317-317:
+            from config import CLASS_LABELS
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\models\deep_learning\lstm_model.py:416-416:
+            import matplotlib.pyplot as plt
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\models\deep_learning\text_tokenizer.py:13-13:
+import numpy as np
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\models\deep_learning\text_tokenizer.py:14-14:
+import pickle
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\models\deep_learning\text_tokenizer.py:15-15:
+from typing import List, Dict, Tuple
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\models\deep_learning\text_tokenizer.py:16-16:
+import warnings
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\models\deep_learning\text_tokenizer.py:26-28:
+from config import (
+    DL_VOCAB_SIZE, DL_MAX_LENGTH, MODEL_FILES
+)
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\models\deep_learning\text_tokenizer.py:20-20:
+    from tensorflow.keras.preprocessing.text import Tokenizer as KerasTokenizer
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\models\deep_learning\text_tokenizer.py:21-21:
+    from tensorflow.keras.preprocessing.sequence import pad_sequences
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\models\deep_learning\__init__.py:20-20:
+    import tensorflow as tf
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\models\deep_learning\__init__.py:29-29:
+    import transformers
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\models\deep_learning\__init__.py:39-39:
+        from .text_tokenizer import TextTokenizer
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\models\deep_learning\__init__.py:40-40:
+        from .lstm_model import LSTMModel
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\models\deep_learning\__init__.py:41-41:
+        from .bilstm_model import BiLSTMModel
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\models\deep_learning\__init__.py:42-42:
+        from .cnn_model import CNNModel
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\models\deep_learning\__init__.py:119-119:
+        import tensorflow as tf
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\models\deep_learning\__init__.py:136-136:
+            import torch
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\models\deep_learning\__init__.py:58-58:
+                from .bert_model import BERTModel
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\reporting\metrics_collector.py:6-6:
+import time
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\reporting\metrics_collector.py:7-7:
+from datetime import datetime
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\reporting\metrics_collector.py:8-8:
+from typing import Dict, List, Optional, Any
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\reporting\metrics_collector.py:9-9:
+from pathlib import Path
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\reporting\quick_report_generator.py:6-6:
+import io
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\reporting\quick_report_generator.py:7-7:
+import base64
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\reporting\quick_report_generator.py:8-8:
+from pathlib import Path
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\reporting\quick_report_generator.py:9-9:
+from typing import Dict, Optional, List, Tuple
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\reporting\quick_report_generator.py:10-10:
+from datetime import datetime
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\reporting\quick_report_generator.py:11-11:
+import json
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\reporting\quick_report_generator.py:14-14:
+    import matplotlib
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\reporting\quick_report_generator.py:16-16:
+    import matplotlib.pyplot as plt
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\reporting\quick_report_generator.py:17-17:
+    import seaborn as sns
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\reporting\training_history.py:6-6:
+import json
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\reporting\training_history.py:7-7:
+import os
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\reporting\training_history.py:8-8:
+from pathlib import Path
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\reporting\training_history.py:9-9:
+from typing import List, Dict, Optional, Tuple
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\reporting\training_history.py:10-10:
+from datetime import datetime
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\reporting\training_history.py:11-11:
+import shutil
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\reporting\__init__.py:5-5:
+from .training_history import TrainingHistory
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\reporting\__init__.py:6-6:
+from .metrics_collector import MetricsCollector
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\reporting\__init__.py:7-7:
+from .quick_report_generator import QuickReportGenerator
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\severity\action_recommender.py:15-15:
+from typing import Dict, List, Tuple
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\severity\action_recommender.py:16-16:
+import warnings
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\severity\action_recommender.py:19-22:
+from config import (
+    ACTION_RULES, ACTION_DESCRIPTIONS, ACTION_URGENCY,
+    SEVERITY_LEVELS, CLASS_LABELS
+)
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\severity\severity_classifier.py:12-12:
+import re
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\severity\severity_classifier.py:13-13:
+from typing import Dict, List, Tuple, Set
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\severity\severity_classifier.py:14-14:
+import warnings
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\severity\severity_classifier.py:17-24:
+from config import (
+    SEVERITY_LEVELS, SEVERITY_WEIGHTS, SEVERITY_THRESHOLDS,
+    MAX_SEVERITY_SCORE, CONTEXT_MODIFIERS,
+    VIOLENCE_KEYWORDS, THREAT_PATTERNS, DEHUMANIZATION_KEYWORDS,
+    RACIAL_SLURS, LGBTQ_SLURS, SEXIST_SLURS, RELIGIOUS_SLURS,
+    ABLEIST_SLURS, SARCASM_INDICATORS, EDUCATIONAL_INDICATORS,
+    QUOTE_INDICATORS, MENTION_PATTERN, URL_PATTERN
+)
+
+E:\Projects\CleanSphere---Hate-Speech-Detection\hate-speech-detection\severity\__init__.py:11-16:
+from .severity_classifier import (
+    KeywordDetector,
+    TextFeaturesAnalyzer,
+    ContextAnalyzer,
+    SeverityScorer
+)
+
