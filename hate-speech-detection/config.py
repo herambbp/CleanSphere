@@ -180,12 +180,13 @@ SVM_CONFIG = {
     'max_iter': 10000
 }
 
-GRADIENT_BOOST_CONFIG = {
-    'n_estimators': 100,
-    'max_depth': 8,
+HIST_GRADIENT_BOOST_CONFIG = {
+    'max_iter': 100,
     'learning_rate': 0.1,
-    'random_state': RANDOM_STATE,
-    'verbose': 1
+    "max_depth": 7,
+    'early_stopping': True,
+    'n_iter_no_change': 10,
+    'random_state': 42
 }
 
 MLP_CONFIG = {

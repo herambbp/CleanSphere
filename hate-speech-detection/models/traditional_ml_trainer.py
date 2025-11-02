@@ -6,7 +6,7 @@ Trains Random Forest, XGBoost, SVM, Gradient Boosting, and MLP
 import numpy as np
 import joblib
 import time
-from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
+from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier, HistGradientBoostingClassifier
 from sklearn.svm import SVC
 from sklearn.neural_network import MLPClassifier
 import warnings
@@ -14,7 +14,7 @@ warnings.filterwarnings('ignore')
 
 from config import (
     RANDOM_FOREST_CONFIG, XGBOOST_CONFIG, SVM_CONFIG,
-    GRADIENT_BOOST_CONFIG, MLP_CONFIG, SVM_MAX_SAMPLES,
+    HIST_GRADIENT_BOOST_CONFIG, MLP_CONFIG, SVM_MAX_SAMPLES,
     MODEL_FILES, METADATA_FILE, COMPARISON_FILE, CLASS_WEIGHTS_LIST, CLASS_WEIGHTS
 )
 from utils import (
@@ -55,7 +55,7 @@ class TraditionalMLTrainer:
         self.models['RandomForest'] = RandomForestClassifier(**RANDOM_FOREST_CONFIG)
         
         # Gradient Boosting
-        self.models['GradientBoosting'] = GradientBoostingClassifier(**GRADIENT_BOOST_CONFIG)
+        self.models['GradientBoosting'] = HistGradientBoostingClassifier(**HIST_GRADIENT_BOOST_CONFIG)
         
         # SVM
         self.models['SVM'] = SVC(**SVM_CONFIG)
