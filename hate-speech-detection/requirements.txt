@@ -47,3 +47,5 @@ openpyxl==3.1.2
 
 # Optional: For logging
 python-json-logger==2.0.7
+
+torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121
