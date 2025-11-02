@@ -167,7 +167,7 @@ class HeavyGPUBERTTrainer:
             self.best_accuracy = test_metrics['accuracy']
             self.best_model_name = model_name
             self.best_model = model
-            logger.info(f"\n✓ NEW BEST MODEL: {model_name} (Test Acc: {self.best_accuracy:.4f})")
+            logger.info(f"\n NEW BEST MODEL: {model_name} (Test Acc: {self.best_accuracy:.4f})")
         
         logger.info("\n" + "="*80)
         logger.info(f"{model_name.upper()} TRAINING COMPLETE")
@@ -452,7 +452,7 @@ def train_heavy_gpu_bert(
         logger.info(f"  Accuracy: {trainer.best_accuracy:.4f}")
         
         if ensemble_acc > trainer.best_accuracy:
-            logger.info(f"\n✓ Ensemble is better by {ensemble_acc - trainer.best_accuracy:.4f}!")
+            logger.info(f"\n Ensemble is better by {ensemble_acc - trainer.best_accuracy:.4f}!")
         
         logger.info("="*80 + "\n")
     
@@ -543,19 +543,19 @@ if __name__ == "__main__":
     print("="*80)
     
     if not HAS_HEAVY_BERT:
-        print("\n❌ Heavy GPU BERT module not available")
+        print("\n Heavy GPU BERT module not available")
         exit(1)
     
     if not HAS_TORCH:
-        print("\n❌ PyTorch not installed")
+        print("\n PyTorch not installed")
         exit(1)
     
     if not HAS_TRANSFORMERS:
-        print("\n❌ Transformers not installed")
+        print("\n Transformers not installed")
         exit(1)
     
-    print("\n✓ All dependencies available")
-    print("✓ Ready for heavy GPU BERT training")
+    print("\n All dependencies available")
+    print(" Ready for heavy GPU BERT training")
     
     # Create dummy data for testing
     print("\n" + "="*80)
@@ -575,5 +575,5 @@ if __name__ == "__main__":
     print(f"Val: {len(X_val)} samples")
     print(f"Test: {len(X_test)} samples")
     
-    print("\n✓ Integration module test complete")
+    print("\n Integration module test complete")
     print("="*80)

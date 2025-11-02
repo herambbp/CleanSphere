@@ -18,31 +18,31 @@ print("\n[TEST 1] Checking Python imports...")
 try:
     import numpy as np
     import pandas as pd
-    print("✓ NumPy and Pandas installed")
+    print(" NumPy and Pandas installed")
 except ImportError as e:
-    print(f"✗ NumPy/Pandas missing: {e}")
+    print(f" NumPy/Pandas missing: {e}")
     sys.exit(1)
 
 # Test 2: Check PyTorch
 print("\n[TEST 2] Checking PyTorch...")
 try:
     import torch
-    print(f"✓ PyTorch installed: {torch.__version__}")
+    print(f" PyTorch installed: {torch.__version__}")
     
     # Check CUDA
     if torch.cuda.is_available():
-        print(f"✓ CUDA available: {torch.version.cuda}")
-        print(f"✓ GPU count: {torch.cuda.device_count()}")
+        print(f" CUDA available: {torch.version.cuda}")
+        print(f" GPU count: {torch.cuda.device_count()}")
         for i in range(torch.cuda.device_count()):
             gpu_name = torch.cuda.get_device_name(i)
             gpu_memory = torch.cuda.get_device_properties(i).total_memory / 1e9
             print(f"  GPU {i}: {gpu_name} ({gpu_memory:.1f} GB)")
     else:
-        print("⚠️ CUDA not available - will run on CPU (very slow)")
+        print(" CUDA not available - will run on CPU (very slow)")
         print("  Install CUDA-enabled PyTorch:")
         print("  pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121")
 except ImportError:
-    print("✗ PyTorch not installed")
+    print(" PyTorch not installed")
     print("  Install with:")
     print("  pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121")
     sys.exit(1)
@@ -51,9 +51,9 @@ except ImportError:
 print("\n[TEST 3] Checking Transformers...")
 try:
     import transformers
-    print(f"✓ Transformers installed: {transformers.__version__}")
+    print(f" Transformers installed: {transformers.__version__}")
 except ImportError:
-    print("✗ Transformers not installed")
+    print(" Transformers not installed")
     print("  Install with: pip install transformers")
     sys.exit(1)
 
@@ -61,9 +61,9 @@ except ImportError:
 print("\n[TEST 4] Checking scikit-learn...")
 try:
     import sklearn
-    print(f"✓ scikit-learn installed: {sklearn.__version__}")
+    print(f" scikit-learn installed: {sklearn.__version__}")
 except ImportError:
-    print("⚠️ scikit-learn not installed (needed for metrics)")
+    print(" scikit-learn not installed (needed for metrics)")
     print("  Install with: pip install scikit-learn")
 
 # Test 5: Check Heavy GPU BERT module
@@ -75,11 +75,11 @@ try:
         HAS_TORCH,
         HAS_TRANSFORMERS
     )
-    print("✓ bert_model_heavy_gpu.py found")
+    print(" bert_model_heavy_gpu.py found")
     print(f"  PyTorch available: {HAS_TORCH}")
     print(f"  Transformers available: {HAS_TRANSFORMERS}")
 except ImportError as e:
-    print(f"✗ bert_model_heavy_gpu.py not found: {e}")
+    print(f" bert_model_heavy_gpu.py not found: {e}")
     print("  Make sure bert_model_heavy_gpu.py is in the current directory")
     sys.exit(1)
 
@@ -91,10 +91,10 @@ try:
         train_heavy_gpu_bert,
         HAS_HEAVY_BERT
     )
-    print("✓ bert_integration.py found")
+    print(" bert_integration.py found")
     print(f"  Heavy BERT available: {HAS_HEAVY_BERT}")
 except ImportError as e:
-    print(f"✗ bert_integration.py not found: {e}")
+    print(f" bert_integration.py not found: {e}")
     print("  Make sure bert_integration.py is in the current directory")
     sys.exit(1)
 
@@ -106,13 +106,13 @@ try:
         batch_size=8,
         epochs=1
     )
-    print("✓ Configuration created")
+    print(" Configuration created")
     
     model = HeavyGPUBERTModel(config=config, num_classes=3)
-    print("✓ Model instance created")
+    print(" Model instance created")
     
     model.build_model()
-    print("✓ Model built successfully")
+    print(" Model built successfully")
     
     # Get model info
     info = model.get_model_info()
@@ -121,7 +121,7 @@ try:
     print(f"  Device: {info['device']}")
     
 except Exception as e:
-    print(f"✗ Model creation failed: {e}")
+    print(f" Model creation failed: {e}")
     import traceback
     traceback.print_exc()
     sys.exit(1)
@@ -136,24 +136,24 @@ try:
     ]
     
     encoded = model.tokenize_texts(test_texts)
-    print(f"✓ Tokenization works")
+    print(f" Tokenization works")
     print(f"  Input shape: {encoded['input_ids'].shape}")
     
 except Exception as e:
-    print(f"✗ Tokenization failed: {e}")
+    print(f" Tokenization failed: {e}")
     sys.exit(1)
 
 # Test 9: Test prediction
 print("\n[TEST 9] Testing prediction...")
 try:
     predictions = model.predict(test_texts)
-    print(f"✓ Prediction works: {predictions}")
+    print(f" Prediction works: {predictions}")
     
     probabilities = model.predict_proba(test_texts)
-    print(f"✓ Probability prediction works: {probabilities.shape}")
+    print(f" Probability prediction works: {probabilities.shape}")
     
 except Exception as e:
-    print(f"✗ Prediction failed: {e}")
+    print(f" Prediction failed: {e}")
     sys.exit(1)
 
 # Test 10: Check project structure
@@ -167,9 +167,9 @@ expected_files = [
 
 for file in expected_files:
     if Path(file).exists():
-        print(f"✓ {file} found")
+        print(f" {file} found")
     else:
-        print(f"⚠️ {file} not found (optional)")
+        print(f" {file} not found (optional)")
 
 # Test 11: List available models
 print("\n[TEST 11] Available BERT models...")
@@ -187,27 +187,27 @@ if torch.cuda.is_available():
     print("\nRecommended models:")
     
     if gpu_memory >= 40:
-        print("  ✓ bert-large (batch_size=128)")
-        print("  ✓ roberta-large (batch_size=64)")
-        print("  ✓ All models with large batches")
-        print("  ✓ Train multiple models simultaneously")
+        print("   bert-large (batch_size=128)")
+        print("   roberta-large (batch_size=64)")
+        print("   All models with large batches")
+        print("   Train multiple models simultaneously")
     elif gpu_memory >= 24:
-        print("  ✓ bert-large (batch_size=64)")
-        print("  ✓ roberta-large (batch_size=32-48)")
-        print("  ✓ Most models work well")
+        print("   bert-large (batch_size=64)")
+        print("   roberta-large (batch_size=32-48)")
+        print("   Most models work well")
     elif gpu_memory >= 16:
-        print("  ✓ bert-large (batch_size=32-48)")
-        print("  ✓ roberta-base (batch_size=64)")
-        print("  ⚠️ roberta-large (batch_size=16-32, may need adjustment)")
+        print("   bert-large (batch_size=32-48)")
+        print("   roberta-base (batch_size=64)")
+        print("   roberta-large (batch_size=16-32, may need adjustment)")
     elif gpu_memory >= 8:
-        print("  ✓ bert-base (batch_size=32)")
-        print("  ✓ roberta-base (batch_size=32)")
-        print("  ✓ distilbert (batch_size=64)")
-        print("  ⚠️ Large models may not fit")
+        print("   bert-base (batch_size=32)")
+        print("   roberta-base (batch_size=32)")
+        print("   distilbert (batch_size=64)")
+        print("   Large models may not fit")
     else:
-        print("  ⚠️ Limited memory - use smaller models")
-        print("  ✓ distilbert (batch_size=16)")
-        print("  ✓ albert-base (batch_size=32)")
+        print("   Limited memory - use smaller models")
+        print("   distilbert (batch_size=16)")
+        print("   albert-base (batch_size=32)")
 else:
     print("No GPU detected - CPU training will be very slow")
     print("Consider using Google Colab or cloud GPU")
@@ -219,13 +219,13 @@ print("=" * 80)
 
 all_tests_passed = True
 if not torch.cuda.is_available():
-    print("\n⚠️ WARNING: No GPU detected")
+    print("\n WARNING: No GPU detected")
     print("  Training will be VERY SLOW on CPU")
     print("  Consider installing CUDA or using Google Colab")
     all_tests_passed = False
 
 if HAS_TORCH and HAS_TRANSFORMERS and HAS_HEAVY_BERT:
-    print("\n✓ ALL TESTS PASSED!")
+    print("\n ALL TESTS PASSED!")
     print("\n[READY TO TRAIN]")
     print("=" * 80)
     print("\nQuick start commands:")
@@ -239,7 +239,7 @@ if HAS_TORCH and HAS_TRANSFORMERS and HAS_HEAVY_BERT:
     print("     python main_train_enhanced_heavy_gpu.py --list-models")
     print("=" * 80)
 else:
-    print("\n✗ SOME TESTS FAILED")
+    print("\n SOME TESTS FAILED")
     print("\nPlease install missing dependencies:")
     if not HAS_TORCH:
         print("  pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121")

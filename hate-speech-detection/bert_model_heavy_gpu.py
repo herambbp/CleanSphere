@@ -313,17 +313,17 @@ class HeavyGPUBERTModel:
             logger.info("\n" + "="*80)
             logger.info("GPU SETUP")
             logger.info("="*80)
-            logger.info(f"✓ CUDA Available: YES")
-            logger.info(f"✓ GPU Count: {gpu_count}")
+            logger.info(f" CUDA Available: YES")
+            logger.info(f" GPU Count: {gpu_count}")
             
             for i in range(gpu_count):
                 gpu_name = torch.cuda.get_device_name(i)
                 gpu_memory_gb = torch.cuda.get_device_properties(i).total_memory / 1e9
-                logger.info(f"✓ GPU {i}: {gpu_name}")
+                logger.info(f" GPU {i}: {gpu_name}")
                 logger.info(f"  Memory: {gpu_memory_gb:.1f} GB")
             
-            logger.info(f"✓ CUDA Version: {torch.version.cuda}")
-            logger.info(f"✓ cuDNN Version: {torch.backends.cudnn.version()}")
+            logger.info(f" CUDA Version: {torch.version.cuda}")
+            logger.info(f" cuDNN Version: {torch.backends.cudnn.version()}")
             
             # Enable cuDNN optimizations
             torch.backends.cudnn.benchmark = True
@@ -331,16 +331,16 @@ class HeavyGPUBERTModel:
             # Check if we can use larger models
             gpu_memory = torch.cuda.get_device_properties(0).total_memory / 1e9
             if gpu_memory >= 16:
-                logger.info(f"✓ GPU Memory >= 16GB - Can train BERT-Large efficiently!")
+                logger.info(f" GPU Memory >= 16GB - Can train BERT-Large efficiently!")
             if gpu_memory >= 24:
-                logger.info(f"✓ GPU Memory >= 24GB - Can train RoBERTa-Large efficiently!")
+                logger.info(f" GPU Memory >= 24GB - Can train RoBERTa-Large efficiently!")
             if gpu_memory >= 40:
-                logger.info(f"✓ GPU Memory >= 40GB - Can train largest models with big batches!")
+                logger.info(f" GPU Memory >= 40GB - Can train largest models with big batches!")
             
             logger.info("="*80 + "\n")
         else:
             self.device = torch.device('cpu')
-            logger.warning("\n⚠️ NO GPU DETECTED - Training will be very slow!")
+            logger.warning("\n NO GPU DETECTED - Training will be very slow!")
             logger.warning("Install CUDA-enabled PyTorch for GPU acceleration\n")
     
     def _initialize_tokenizer(self):
@@ -359,7 +359,7 @@ class HeavyGPUBERTModel:
         else:  # bert
             self.tokenizer = BertTokenizer.from_pretrained(model_name)
         
-        logger.info(f"✓ Tokenizer loaded: {model_type}")
+        logger.info(f" Tokenizer loaded: {model_type}")
         logger.info(f"  Vocab size: {self.tokenizer.vocab_size:,}")
     
     def build_model(self):
@@ -411,7 +411,7 @@ class HeavyGPUBERTModel:
         trainable_params = sum(p.numel() for p in self.model.parameters() if p.requires_grad)
         model_size_gb = total_params * 4 / 1e9  # FP32 size
         
-        logger.info(f"✓ Model built in {load_time:.1f} seconds")
+        logger.info(f" Model built in {load_time:.1f} seconds")
         logger.info(f"  Total parameters: {total_params:,}")
         logger.info(f"  Trainable parameters: {trainable_params:,}")
         logger.info(f"  Model size (FP32): ~{model_size_gb:.2f} GB")
@@ -509,21 +509,21 @@ class HeavyGPUBERTModel:
                 num_warmup_steps=num_warmup_steps,
                 num_training_steps=num_training_steps
             )
-            logger.info(f"✓ Scheduler: Cosine with warmup ({num_warmup_steps} steps)")
+            logger.info(f" Scheduler: Cosine with warmup ({num_warmup_steps} steps)")
         else:  # linear
             self.scheduler = get_linear_schedule_with_warmup(
                 self.optimizer,
                 num_warmup_steps=num_warmup_steps,
                 num_training_steps=num_training_steps
             )
-            logger.info(f"✓ Scheduler: Linear with warmup ({num_warmup_steps} steps)")
+            logger.info(f" Scheduler: Linear with warmup ({num_warmup_steps} steps)")
         
         # Setup mixed precision scaler
         if self.config.use_mixed_precision:
             self.scaler = GradScaler()
-            logger.info("✓ Mixed Precision: Enabled (FP16)")
+            logger.info(" Mixed Precision: Enabled (FP16)")
         
-        logger.info(f"✓ Optimizer: AdamW (lr={self.config.learning_rate})")
+        logger.info(f" Optimizer: AdamW (lr={self.config.learning_rate})")
     
     def compute_class_weights(self, labels: np.ndarray) -> torch.Tensor:
         """Compute class weights for imbalanced datasets."""
@@ -533,7 +533,7 @@ class HeavyGPUBERTModel:
         weights = compute_class_weight('balanced', classes=classes, y=labels)
         weights_tensor = torch.tensor(weights, dtype=torch.float32).to(self.device)
         
-        logger.info(f"✓ Class weights computed: {weights}")
+        logger.info(f" Class weights computed: {weights}")
         return weights_tensor
     
     def train_epoch(
@@ -725,17 +725,17 @@ class HeavyGPUBERTModel:
         val_dataloader = None
         if X_val is not None and y_val is not None:
             val_dataloader = self.prepare_dataloader(X_val, y_val, shuffle=False)
-            logger.info(f"✓ Training samples: {len(X_train):,}")
-            logger.info(f"✓ Validation samples: {len(X_val):,}")
+            logger.info(f" Training samples: {len(X_train):,}")
+            logger.info(f" Validation samples: {len(X_val):,}")
         else:
-            logger.info(f"✓ Training samples: {len(X_train):,}")
+            logger.info(f" Training samples: {len(X_train):,}")
         
-        logger.info(f"✓ Batch size: {self.config.batch_size}")
-        logger.info(f"✓ Batches per epoch: {len(train_dataloader)}")
+        logger.info(f" Batch size: {self.config.batch_size}")
+        logger.info(f" Batches per epoch: {len(train_dataloader)}")
         
         # Calculate training steps
         num_training_steps = len(train_dataloader) * self.config.epochs
-        logger.info(f"✓ Total training steps: {num_training_steps:,}")
+        logger.info(f" Total training steps: {num_training_steps:,}")
         
         # Setup optimizer and scheduler
         self.setup_optimizer_and_scheduler(num_training_steps)
@@ -793,14 +793,14 @@ class HeavyGPUBERTModel:
                     self.best_val_loss = val_loss
                     self.epochs_no_improve = 0
                     improved = True
-                    logger.info(f"  ✓ NEW BEST MODEL! (Val Acc: {val_acc:.4f})")
+                    logger.info(f"   NEW BEST MODEL! (Val Acc: {val_acc:.4f})")
                 else:
                     self.epochs_no_improve += 1
                     logger.info(f"  No improvement for {self.epochs_no_improve} epoch(s)")
                 
                 # Early stopping
                 if self.config.early_stopping and self.epochs_no_improve >= self.config.patience:
-                    logger.info(f"\n🛑 EARLY STOPPING at epoch {epoch+1}")
+                    logger.info(f"\n EARLY STOPPING at epoch {epoch+1}")
                     logger.info(f"  Best validation accuracy: {self.best_val_acc:.4f}")
                     break
             
@@ -941,7 +941,7 @@ class HeavyGPUBERTModel:
             with open(history_path, 'w') as f:
                 json.dump(history_serializable, f, indent=2)
         
-        logger.info(f"✓ Model saved successfully")
+        logger.info(f" Model saved successfully")
     
     @staticmethod
     def load(filepath: str) -> 'HeavyGPUBERTModel':
@@ -982,7 +982,7 @@ class HeavyGPUBERTModel:
             with open(history_path, 'r') as f:
                 bert_model.history = json.load(f)
         
-        logger.info(f"✓ Model loaded successfully")
+        logger.info(f" Model loaded successfully")
         
         return bert_model
     
@@ -1073,23 +1073,23 @@ if __name__ == "__main__":
     
     # Check dependencies
     if not HAS_TORCH:
-        print("\n❌ PyTorch not installed")
+        print("\n PyTorch not installed")
         print("Install: pip install torch torchvision torchaudio")
         exit(1)
     
     if not HAS_TRANSFORMERS:
-        print("\n❌ Transformers not installed")
+        print("\n Transformers not installed")
         print("Install: pip install transformers")
         exit(1)
     
-    print(f"\n✓ PyTorch version: {torch.__version__}")
-    print(f"✓ CUDA available: {torch.cuda.is_available()}")
+    print(f"\n PyTorch version: {torch.__version__}")
+    print(f" CUDA available: {torch.cuda.is_available()}")
     
     if torch.cuda.is_available():
-        print(f"✓ CUDA version: {torch.version.cuda}")
-        print(f"✓ GPU: {torch.cuda.get_device_name(0)}")
+        print(f" CUDA version: {torch.version.cuda}")
+        print(f" GPU: {torch.cuda.get_device_name(0)}")
         gpu_memory = torch.cuda.get_device_properties(0).total_memory / 1e9
-        print(f"✓ GPU Memory: {gpu_memory:.1f} GB")
+        print(f" GPU Memory: {gpu_memory:.1f} GB")
     
     # Test model creation
     print("\n" + "="*80)
@@ -1107,15 +1107,15 @@ if __name__ == "__main__":
     ]
     
     encoded = model.tokenize_texts(test_texts)
-    print(f"✓ Tokenization works")
+    print(f" Tokenization works")
     print(f"  Input shape: {encoded['input_ids'].shape}")
     
     print("\n3. Testing prediction...")
     predictions = model.predict(test_texts)
-    print(f"✓ Prediction works: {predictions}")
+    print(f" Prediction works: {predictions}")
     
     probabilities = model.predict_proba(test_texts)
-    print(f"✓ Predict proba works: {probabilities.shape}")
+    print(f" Predict proba works: {probabilities.shape}")
     
     # Show model info
     print("\n" + "="*80)
@@ -1132,7 +1132,7 @@ if __name__ == "__main__":
             print(f"{key:25s}: {value}")
     
     print("\n" + "="*80)
-    print("HEAVY GPU BERT MODEL TEST COMPLETE ✓")
+    print("HEAVY GPU BERT MODEL TEST COMPLETE ")
     print("="*80)
     print("\nReady for training with heavy GPU!")
     if torch.cuda.is_available():
