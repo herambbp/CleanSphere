@@ -2,6 +2,7 @@
 FastAPI Backend for Hate Speech Detection System with CSV Processing and Intelligent Verification
 Provides RESTful API endpoints for classification, explanation, moderation, and CSV batch processing
 Now includes OpenAI GPT-4o-mini verification for intelligent feedback and corrections
+**NEW: Digital Footprint Scoring System for comprehensive user behavior profiling**
 
 Features:
 - Single text classification
@@ -11,7 +12,10 @@ Features:
 - Severity analysis
 - Content moderation
 - User dashboard analytics
-- **NEW: Intelligent verification mode with OpenAI GPT-4o-mini**
+- Intelligent verification mode with OpenAI GPT-4o-mini
+- **NEW: Digital Footprint Scoring & Risk Profiling**
+- **NEW: Temporal behavior analysis & pattern detection**
+- **NEW: User comparison & historical tracking**
 """
 
 from fastapi import FastAPI, HTTPException, BackgroundTasks, status, File, UploadFile
@@ -56,6 +60,19 @@ try:
 except ImportError:
     HAS_CSV_PROCESSOR = False
 
+# ==================== NEW: DIGITAL FOOTPRINT INTEGRATION ====================
+# Import Digital Footprint Scoring System
+try:
+    from digital_footprint_scorer import (
+        DigitalFootprintScorer,
+        integrate_with_csv_processor
+    )
+    HAS_DIGITAL_FOOTPRINT = True
+except ImportError:
+    HAS_DIGITAL_FOOTPRINT = False
+    print("Warning: digital_footprint_scorer.py not found. Digital footprint features will be disabled.")
+    print("To enable: Place digital_footprint_scorer.py in the project root directory")
+
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
@@ -81,9 +98,9 @@ if HAS_OPENAI:
 # ==================== FASTAPI APP ====================
 
 app = FastAPI(
-    title="Hate Speech Detection API with Intelligent Verification",
-    description="Advanced hate speech detection with explainable AI, severity analysis, CSV batch processing, user analytics dashboard, and OpenAI verification",
-    version="3.0.0",
+    title="Hate Speech Detection API with Intelligent Verification & Digital Footprint Scoring",
+    description="Advanced hate speech detection with explainable AI, severity analysis, CSV batch processing, user analytics dashboard, OpenAI verification, and comprehensive digital footprint scoring",
+    version="4.0.0",
     docs_url="/docs",
     redoc_url="/redoc"
 )
@@ -98,9 +115,19 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# ==================== GLOBAL CLASSIFIER ====================
+# ==================== GLOBAL INSTANCES ====================
 
 classifier = None
+
+# NEW: Global Digital Footprint Scorer
+footprint_scorer = None
+if HAS_DIGITAL_FOOTPRINT:
+    try:
+        footprint_scorer = DigitalFootprintScorer()
+        logger.info("Digital Footprint Scorer initialized successfully")
+    except Exception as e:
+        logger.error(f"Failed to initialize Digital Footprint Scorer: {e}")
+        HAS_DIGITAL_FOOTPRINT = False
 
 def get_classifier():
     """Lazy load classifier (loaded on first request)"""
@@ -272,7 +299,7 @@ class ClassificationResponse(BaseModel):
     severity: Optional[Dict[str, Any]] = None
     explanation: Optional[Dict[str, Any]] = None
     action: Optional[Dict[str, Any]] = None
-    verification: Optional[Dict[str, Any]] = None  # NEW: GPT verification results
+    verification: Optional[Dict[str, Any]] = None  # GPT verification results
     timestamp: str
     model_info: Dict[str, str]
 
@@ -304,7 +331,59 @@ class HealthResponse(BaseModel):
     csv_processor_available: bool
     openai_available: bool
     intelligent_mode_available: bool
+    digital_footprint_available: bool  # NEW
     version: str
+
+
+# ==================== NEW: DIGITAL FOOTPRINT MODELS ====================
+
+class DigitalFootprintRequest(BaseModel):
+    """Request model for digital footprint analysis"""
+    user_id: str = Field(..., description="User identifier")
+    comments: List[Dict[str, Any]] = Field(
+        ...,
+        description="List of comment dicts with keys: timestamp, comment, prediction, confidence"
+    )
+    account_age_days: Optional[int] = Field(None, description="Account age in days")
+    platform_data: Optional[Dict[str, Any]] = Field(
+        None,
+        description="Platform metadata (followers, engagement_rate, is_verified)"
+    )
+
+
+class FootprintComparisonRequest(BaseModel):
+    """Request model for comparing footprints"""
+    user_id_1: str
+    user_id_2: str
+    footprint_1: Optional[Dict] = None
+    footprint_2: Optional[Dict] = None
+
+
+class BatchFootprintRequest(BaseModel):
+    """Request model for batch footprint analysis"""
+    users: Dict[str, List[Dict[str, Any]]] = Field(
+        ...,
+        description="Dict mapping user_id to list of their comments"
+    )
+    account_metadata: Optional[Dict[str, Dict]] = Field(
+        None,
+        description="Optional metadata for each user"
+    )
+
+
+class DigitalFootprintResponse(BaseModel):
+    """Response model for digital footprint analysis"""
+    user_id: str
+    footprint_score: float
+    risk_level: str
+    score_breakdown: Dict[str, float]
+    statistics: Dict[str, Any]
+    patterns: Dict[str, Any]
+    recommendations: List[str]
+    account_info: Dict[str, Any]
+    analysis_timestamp: str
+    visualization: Optional[str] = None
+
 
 # ==================== UTILITY FUNCTIONS ====================
 
@@ -391,11 +470,11 @@ def make_json_serializable(obj):
 async def root():
     """Root endpoint - API information"""
     return {
-        "message": "Hate Speech Detection API with Intelligent Verification",
-        "version": "3.0.0",
+        "message": "Hate Speech Detection API with Intelligent Verification & Digital Footprint Scoring",
+        "version": "4.0.0",
         "docs": "/docs",
         "health": "/health",
-        "features": "Classification, Severity Analysis, CSV Processing, User Analytics, OpenAI Verification"
+        "features": "Classification, Severity Analysis, CSV Processing, User Analytics, OpenAI Verification, Digital Footprint Scoring"
     }
 
 
@@ -413,7 +492,8 @@ async def health_check():
             csv_processor_available=HAS_CSV_PROCESSOR,
             openai_available=HAS_OPENAI and openai_client is not None,
             intelligent_mode_available=HAS_OPENAI and openai_client is not None,
-            version="3.0.0"
+            digital_footprint_available=HAS_DIGITAL_FOOTPRINT,
+            version="4.0.0"
         )
     except Exception as e:
         logger.error(f"Health check failed: {e}")
@@ -668,6 +748,416 @@ async def process_csv_file(
             except Exception as e:
                 logger.warning(f"Failed to cleanup temp file: {e}")
 
+
+# ==================== NEW: DIGITAL FOOTPRINT ENDPOINTS ====================
+
+@app.post("/analyze-digital-footprint", response_model=DigitalFootprintResponse)
+async def analyze_digital_footprint(request: DigitalFootprintRequest):
+    """
+    Analyze a user's digital footprint based on their comment history.
+    
+    **Required Fields:**
+    - user_id: Unique user identifier
+    - comments: List of comment objects with timestamp, comment, prediction, confidence
+    
+    **Optional Fields:**
+    - account_age_days: Age of the account
+    - platform_data: Additional platform metrics (followers, engagement, etc.)
+    
+    **Returns:**
+    - Comprehensive footprint analysis with risk score and recommendations
+    """
+    if not HAS_DIGITAL_FOOTPRINT:
+        raise HTTPException(
+            status_code=501,
+            detail="Digital Footprint Scoring not available. Please ensure digital_footprint_scorer.py is in the project directory."
+        )
+    
+    try:
+        # Convert comments to DataFrame
+        comments_df = pd.DataFrame(request.comments)
+        
+        # Ensure timestamp is datetime
+        if 'timestamp' in comments_df.columns:
+            comments_df['timestamp'] = pd.to_datetime(comments_df['timestamp'])
+        else:
+            # Create synthetic timestamps if not provided
+            comments_df['timestamp'] = pd.date_range(
+                end=datetime.now(),
+                periods=len(comments_df),
+                freq='1H'
+            )
+        
+        # Validate required columns
+        required_cols = ['comment', 'prediction', 'confidence']
+        missing_cols = [col for col in required_cols if col not in comments_df.columns]
+        if missing_cols:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Missing required columns: {missing_cols}"
+            )
+        
+        # Calculate footprint
+        footprint = footprint_scorer.calculate_footprint_score(
+            user_id=request.user_id,
+            comments_df=comments_df,
+            account_age_days=request.account_age_days,
+            platform_data=request.platform_data
+        )
+        
+        # Add visualization
+        footprint['visualization'] = footprint_scorer.visualize_footprint(footprint)
+        
+        logger.info(
+            f"Digital footprint analyzed: {request.user_id} - "
+            f"Score: {footprint['footprint_score']}, Risk: {footprint['risk_level']}"
+        )
+        
+        return DigitalFootprintResponse(**footprint)
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Digital footprint analysis error: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to analyze digital footprint: {str(e)}"
+        )
+
+
+@app.get("/user/{user_id}/footprint", response_model=DigitalFootprintResponse)
+async def get_user_footprint(user_id: str):
+    """
+    Retrieve cached digital footprint for a user.
+    
+    Returns the most recent footprint analysis if available.
+    If no cached data exists, returns 404.
+    """
+    if not HAS_DIGITAL_FOOTPRINT:
+        raise HTTPException(
+            status_code=501,
+            detail="Digital Footprint Scoring not available."
+        )
+    
+    if user_id not in footprint_scorer.user_footprints:
+        raise HTTPException(
+            status_code=404,
+            detail=f"No footprint data found for user: {user_id}. "
+                   f"Please analyze first using /analyze-digital-footprint"
+        )
+    
+    footprint = footprint_scorer.user_footprints[user_id]
+    footprint['visualization'] = footprint_scorer.visualize_footprint(footprint)
+    
+    return DigitalFootprintResponse(**footprint)
+
+
+@app.post("/compare-footprints")
+async def compare_footprints(request: FootprintComparisonRequest):
+    """
+    Compare digital footprints of two users or same user across time periods.
+    
+    **Options:**
+    1. Provide user_id_1 and user_id_2 to compare cached footprints
+    2. Provide footprint_1 and footprint_2 objects directly for custom comparison
+    
+    **Returns:**
+    - Score difference
+    - Risk level change
+    - Behavior trend (improving/worsening/stable)
+    - Component-wise breakdown
+    """
+    if not HAS_DIGITAL_FOOTPRINT:
+        raise HTTPException(
+            status_code=501,
+            detail="Digital Footprint Scoring not available."
+        )
+    
+    try:
+        # Get footprints
+        if request.footprint_1 and request.footprint_2:
+            footprint1 = request.footprint_1
+            footprint2 = request.footprint_2
+        else:
+            # Retrieve from cache
+            if request.user_id_1 not in footprint_scorer.user_footprints:
+                raise HTTPException(
+                    status_code=404,
+                    detail=f"No footprint data for user: {request.user_id_1}"
+                )
+            if request.user_id_2 not in footprint_scorer.user_footprints:
+                raise HTTPException(
+                    status_code=404,
+                    detail=f"No footprint data for user: {request.user_id_2}"
+                )
+            
+            footprint1 = footprint_scorer.user_footprints[request.user_id_1]
+            footprint2 = footprint_scorer.user_footprints[request.user_id_2]
+        
+        # Compare
+        comparison = footprint_scorer.compare_footprints(footprint1, footprint2)
+        
+        logger.info(
+            f"Footprint comparison: {comparison['user1']} vs {comparison['user2']} - "
+            f"Trend: {comparison['behavior_trend']}"
+        )
+        
+        return comparison
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Footprint comparison error: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to compare footprints: {str(e)}"
+        )
+
+
+@app.post("/batch-footprint-analysis")
+async def batch_footprint_analysis(request: BatchFootprintRequest):
+    """
+    Analyze digital footprints for multiple users in batch.
+    
+    **Input:**
+    - users: Dict mapping user_id to their list of comments
+    - account_metadata: Optional dict with account info per user
+    
+    **Returns:**
+    - DataFrame (as JSON) with all users ranked by footprint score
+    - Individual footprint details for each user
+    """
+    if not HAS_DIGITAL_FOOTPRINT:
+        raise HTTPException(
+            status_code=501,
+            detail="Digital Footprint Scoring not available."
+        )
+    
+    try:
+        # Convert user data to DataFrames
+        users_data = {}
+        for user_id, comments in request.users.items():
+            df = pd.DataFrame(comments)
+            
+            # Ensure timestamp
+            if 'timestamp' not in df.columns:
+                df['timestamp'] = pd.date_range(
+                    end=datetime.now(),
+                    periods=len(df),
+                    freq='1H'
+                )
+            else:
+                df['timestamp'] = pd.to_datetime(df['timestamp'])
+            
+            users_data[user_id] = df
+        
+        # Batch analyze
+        results_df = footprint_scorer.batch_analyze_users(
+            users_data=users_data,
+            account_metadata=request.account_metadata
+        )
+        
+        # Get individual footprints
+        individual_footprints = {
+            user_id: footprint_scorer.user_footprints[user_id]
+            for user_id in request.users.keys()
+            if user_id in footprint_scorer.user_footprints
+        }
+        
+        logger.info(f"Batch analyzed {len(request.users)} users")
+        
+        return {
+            "summary": results_df.to_dict(orient='records'),
+            "total_users": len(request.users),
+            "high_risk_users": len(results_df[results_df['risk_level'].isin(['critical', 'high'])]),
+            "individual_footprints": make_json_serializable(individual_footprints),
+            "timestamp": datetime.utcnow().isoformat()
+        }
+        
+    except Exception as e:
+        logger.error(f"Batch footprint analysis error: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to perform batch analysis: {str(e)}"
+        )
+
+
+@app.post("/process-csv-with-footprint")
+async def process_csv_with_footprint(
+    file: UploadFile = File(...),
+    include_footprint: bool = True,
+    intelligent_mode: bool = False
+):
+    """
+    Enhanced CSV processing that includes digital footprint analysis.
+    
+    Same as /process-csv but adds comprehensive digital footprint scores
+    for each user in the dataset.
+    
+    **Parameters:**
+    - file: CSV file to process
+    - include_footprint: Include digital footprint analysis (default: true)
+    - intelligent_mode: Enable OpenAI verification (default: false)
+    
+    **Returns:**
+    - All standard CSV processing results
+    - Digital footprint analysis for each user
+    - Enhanced risk rankings
+    """
+    if not HAS_CSV_PROCESSOR:
+        raise HTTPException(
+            status_code=501,
+            detail="CSV processing not available"
+        )
+    
+    if not file.filename.endswith('.csv'):
+        raise HTTPException(
+            status_code=400,
+            detail="File must be a CSV file"
+        )
+    
+    temp_path = None
+    try:
+        # Save uploaded file temporarily
+        with tempfile.NamedTemporaryFile(delete=False, suffix='.csv') as temp_file:
+            shutil.copyfileobj(file.file, temp_file)
+            temp_path = temp_file.name
+        
+        logger.info(
+            f"Processing CSV with footprint analysis: {file.filename} "
+            f"(Footprint: {include_footprint}, Intelligent Mode: {intelligent_mode})"
+        )
+        
+        # Process CSV (existing code)
+        processor = CSVProcessor()
+        results_df = processor.process_csv(temp_path)
+        
+        # Get standard analytics
+        user_analytics = processor.get_user_analytics()
+        summary = processor.generate_summary_report()
+        
+        # Add digital footprint analysis
+        digital_footprints = {}
+        if include_footprint and HAS_DIGITAL_FOOTPRINT:
+            logger.info("Calculating digital footprints for all users...")
+            digital_footprints = integrate_with_csv_processor(results_df)
+            
+            # Add footprint scores to user analytics
+            for user_id, footprint in digital_footprints.items():
+                if user_id in user_analytics:
+                    user_analytics[user_id]['digital_footprint_score'] = footprint['footprint_score']
+                    user_analytics[user_id]['footprint_risk_level'] = footprint['risk_level']
+                    user_analytics[user_id]['top_recommendation'] = (
+                        footprint['recommendations'][0] if footprint['recommendations'] else ''
+                    )
+        
+        # Create enhanced top risk users list (sorted by footprint score)
+        top_risk_users_enhanced = []
+        if digital_footprints:
+            for user_id, footprint in sorted(
+                digital_footprints.items(),
+                key=lambda x: x[1]['footprint_score'],
+                reverse=True
+            )[:10]:
+                top_risk_users_enhanced.append({
+                    'user': user_id,
+                    'footprint_score': footprint['footprint_score'],
+                    'risk_level': footprint['risk_level'],
+                    'hate_speech_count': footprint['statistics']['hate_speech_count'],
+                    'total_comments': footprint['statistics']['total_comments'],
+                    'temporal_trend': footprint['score_breakdown']['temporal_trend'],
+                    'top_recommendations': footprint['recommendations'][:3]
+                })
+        
+        logger.info(
+            f"CSV processed with footprints: {len(results_df)} comments, "
+            f"{len(digital_footprints)} users analyzed"
+        )
+        
+        # Prepare response
+        response = {
+            "status": "success",
+            "total_comments": int(len(results_df)),
+            "total_users": int(len(user_analytics)),
+            "summary": make_json_serializable(summary),
+            "user_analytics": make_json_serializable(user_analytics),
+            "digital_footprints": make_json_serializable(digital_footprints) if include_footprint else {},
+            "top_risk_users": top_risk_users_enhanced if digital_footprints else make_json_serializable(
+                get_top_risk_users(user_analytics, 10)
+            ),
+            "footprint_analysis_included": include_footprint and HAS_DIGITAL_FOOTPRINT,
+            "intelligent_mode_enabled": intelligent_mode,
+            "timestamp": datetime.utcnow().isoformat()
+        }
+        
+        return JSONResponse(content=response)
+        
+    except ValueError as e:
+        logger.error(f"CSV validation error: {e}")
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"CSV processing error: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to process CSV: {str(e)}"
+        )
+    finally:
+        # Cleanup
+        if temp_path and Path(temp_path).exists():
+            try:
+                Path(temp_path).unlink()
+            except Exception as e:
+                logger.warning(f"Failed to cleanup temp file: {e}")
+
+
+@app.get("/footprint-info")
+async def get_footprint_info():
+    """
+    Get information about the digital footprint scoring system.
+    
+    Returns details about:
+    - Score components and weights
+    - Risk level thresholds
+    - Available patterns detected
+    """
+    if not HAS_DIGITAL_FOOTPRINT:
+        raise HTTPException(
+            status_code=501,
+            detail="Digital Footprint Scoring not available."
+        )
+    
+    from digital_footprint_scorer import DigitalFootprintScorer
+    
+    return {
+        "version": "1.0.0",
+        "description": "Digital Footprint Scoring System for comprehensive user risk profiling",
+        "score_components": {
+            name: {
+                "weight": weight,
+                "description": {
+                    'content_severity': "Severity of content posted by user",
+                    'temporal_trend': "Behavior improvement or deterioration over time",
+                    'frequency': "How often user posts problematic content",
+                    'recency': "How recent is the problematic activity",
+                    'consistency': "Consistency of problematic behavior vs outliers",
+                    'engagement_risk': "Risk based on follower count and engagement"
+                }.get(name, "")
+            }
+            for name, weight in DigitalFootprintScorer.WEIGHTS.items()
+        },
+        "risk_levels": DigitalFootprintScorer.RISK_THRESHOLDS,
+        "patterns_detected": [
+            "escalation_detected",
+            "improvement_detected",
+            "bursty_behavior",
+            "time_of_day_pattern",
+            "targeted_harassment"
+        ],
+        "total_users_analyzed": len(footprint_scorer.user_footprints),
+        "cache_size": len(footprint_scorer.user_footprints)
+    }
+
+
 # ==================== INFO ENDPOINTS ====================
 
 @app.get("/classes", response_model=Dict[int, str])
@@ -694,6 +1184,7 @@ async def get_model_info():
             "type": info.get("model_type", "unknown"),
             "metrics": info.get("metrics", {}),
             "intelligent_mode_available": openai_client is not None,
+            "digital_footprint_available": HAS_DIGITAL_FOOTPRINT,
             "timestamp": datetime.utcnow().isoformat()
         }
         
@@ -738,11 +1229,12 @@ async def general_exception_handler(request, exc):
 async def startup_event():
     """Run on API startup"""
     logger.info("=" * 80)
-    logger.info("Hate Speech Detection API v3.0 - Starting Up")
+    logger.info("Hate Speech Detection API v4.0 - Starting Up")
     logger.info("=" * 80)
     logger.info("Features: Classification, Severity Analysis, CSV Processing, User Analytics")
     logger.info(f"Intelligent Mode (OpenAI): {'Available' if openai_client else 'Not Available'}")
     logger.info(f"CSV Processor: {'Available' if HAS_CSV_PROCESSOR else 'Not Available'}")
+    logger.info(f"Digital Footprint Scoring: {'Available' if HAS_DIGITAL_FOOTPRINT else 'Not Available'}")
     logger.info("Classifier will be loaded on first request")
     logger.info("=" * 80)
 
@@ -761,13 +1253,14 @@ if __name__ == "__main__":
     import uvicorn
     
     print("=" * 80)
-    print("HATE SPEECH DETECTION API v3.0")
-    print("With CSV Processing, User Analytics & Intelligent Verification")
+    print("HATE SPEECH DETECTION API v4.0")
+    print("With CSV Processing, User Analytics, Intelligent Verification & Digital Footprint Scoring")
     print("=" * 80)
     print("\nStarting server...")
     print("Docs available at: http://localhost:8000/docs")
     print("Health check at: http://localhost:8000/health")
     print(f"Intelligent Mode: {'Available' if openai_client else 'Requires OPENAI_API_KEY'}")
+    print(f"Digital Footprint: {'Available' if HAS_DIGITAL_FOOTPRINT else 'Requires digital_footprint_scorer.py'}")
     print("=" * 80)
     
     uvicorn.run(
