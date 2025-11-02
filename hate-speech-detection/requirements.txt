@@ -1,51 +1,52 @@
+###############################################
+# Hate Speech Detection API - Requirements
+###############################################
+
+########## Core ML & NLP ##########
 gensim
 vaderSentiment
 textstat
 tensorflow
 transformers
-fastapi
-pydantic
-uvicorn
-matplotlib
-seaborn
+nltk
 xgboost
 shap
 lime
-nltk
-openai
 keras
 tf-keras
-# FastAPI Requirements for Hate Speech Detection API
+openai
 
-# Core API Framework
+########## Visualization ##########
+matplotlib
+seaborn
+
+########## Core API Framework ##########
 fastapi==0.104.1
 uvicorn[standard]==0.24.0
 pydantic==2.5.0
 python-multipart==0.0.6
 
-# HTTP and CORS
+########## HTTP and CORS ##########
 httpx==0.25.1
 python-multipart==0.0.6
 
-# Already included in main requirements
+########## Core Dependencies ##########
 numpy>=1.21.0
 pandas>=1.3.0
 scikit-learn>=1.0.0
 joblib>=1.1.0
 
-# Optional but recommended
+########## Optional but Recommended ##########
 python-dotenv==1.0.0  # Environment variables
 redis==5.0.1  # Caching (optional)
 prometheus-fastapi-instrumentator==6.1.0  # Monitoring (optional)
 
-
-# OpenAI Integration for Intelligent Verification
+########## OpenAI Integration for Intelligent Verification ##########
 openai==1.3.0
 
-# Optional: For CSV processing
-openpyxl==3.1.2
+########## Optional Utilities ##########
+openpyxl==3.1.2  # For CSV processing
+python-json-logger==2.0.7  # For logging
 
-# Optional: For logging
-python-json-logger==2.0.7
-
+########## PyTorch (CUDA 12.1) ##########
 torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121
