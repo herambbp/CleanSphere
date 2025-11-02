@@ -470,7 +470,7 @@ class HeavyGPUBERTModel:
             dataset,
             batch_size=batch_size,
             shuffle=shuffle,
-            num_workers=4,  # Parallel data loading
+            num_workers=0,  # Parallel data loading
             pin_memory=True,  # Faster GPU transfer
             drop_last=False
         )

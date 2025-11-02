@@ -593,19 +593,19 @@ DL_COMPARISON_FILE = RESULTS_DIR / 'dl_model_comparison.csv'  # Phase 5 specific
 # Normalized so Offensive (majority class) = 1.0
 
 CLASS_WEIGHTS = {
-    0: 13.4,  # Hate speech (5.8% of data → highest weight)
+    0: 1.0,  # Hate speech (5.8% of data → highest weight)
     1: 1.0,   # Offensive language (77.4% of data → baseline weight)
-    2: 4.6    # Neither (16.8% of data → medium weight)
+    2: 1.0    # Neither (16.8% of data → medium weight)
 }
 
 # For sklearn models, convert to list format
-CLASS_WEIGHTS_LIST = [13.4, 1.0, 4.6]
+CLASS_WEIGHTS_LIST = [1.0, 1.0, 1.0]
 
 # For detailed info
 CLASS_DISTRIBUTION = {
-    'hate_speech': {'percentage': 5.8, 'weight': 13.4},
+    'hate_speech': {'percentage': 5.8, 'weight': 1.0},
     'offensive': {'percentage': 77.4, 'weight': 1.0},
-    'neither': {'percentage': 16.8, 'weight': 4.6}
+    'neither': {'percentage': 16.8, 'weight': 1.0}
 }
 
 # ==================== EXPLAINABILITY CONFIG ====================
