@@ -150,10 +150,10 @@ def fix_tokenizer_automatically():
 
 # ==================== DATASET LOADING ====================
 
-def load_all_csv_datasets(data_dir: Path = RAW_DATA_DIR, exclude: List[str] = None, 
-                          filter_confidence: bool = False, min_confidence: float = 0.5) -> pd.DataFrame:
+def load_all_csv_datasets(data_dir: Path = RAW_DATA_DIR, exclude: List[str] = None) -> pd.DataFrame:
     """
     Load and combine ALL CSV files from data/raw directory.
+    Now supports both 'tweet' and 'text' column names.
     
     Args:
         data_dir: Directory containing CSV files
@@ -188,18 +188,23 @@ def load_all_csv_datasets(data_dir: Path = RAW_DATA_DIR, exclude: List[str] = No
             # Load CSV
             logger.info(f"  [LOAD] Loading {csv_file.name}...")
             df = pd.read_csv(csv_file, encoding="latin-1", on_bad_lines="skip")
-
-            if filter_confidence and 'confidence' in df.columns:
-                initial_count = len(df)
-                df = df[df['confidence'] >= min_confidence]
-                filtered_count = initial_count - len(df)
-                if filtered_count > 0:
-                    logger.info(f"  [FILTER] Removed {filtered_count:,} low-confidence samples (< {min_confidence})")
             
-            # Validate columns
-            if 'tweet' not in df.columns or 'class' not in df.columns:
-                logger.warning(f"  [WARN] Skipping {csv_file.name} - missing required columns (tweet, class)")
+            # Validate 'class' column
+            if 'class' not in df.columns:
+                logger.warning(f"  [WARN] Skipping {csv_file.name} - missing 'class' column")
+                logger.warning(f"         Available columns: {list(df.columns)}")
                 continue
+            
+            # Handle both 'tweet' and 'text' column names
+            if 'tweet' not in df.columns and 'text' not in df.columns:
+                logger.warning(f"  [WARN] Skipping {csv_file.name} - missing text column (need 'tweet' or 'text')")
+                logger.warning(f"         Available columns: {list(df.columns)}")
+                continue
+            
+            # Standardize column name to 'tweet'
+            if 'text' in df.columns and 'tweet' not in df.columns:
+                df = df.rename(columns={'text': 'tweet'})
+                logger.info(f"  [INFO] Renamed 'text' column to 'tweet'")
             
             # Clean data
             df = df.dropna(subset=['tweet', 'class'])
@@ -217,6 +222,8 @@ def load_all_csv_datasets(data_dir: Path = RAW_DATA_DIR, exclude: List[str] = No
             
         except Exception as e:
             logger.error(f"  [ERROR] Error loading {csv_file.name}: {e}")
+            import traceback
+            logger.error(traceback.format_exc())
             continue
     
     if not all_dataframes:
@@ -253,7 +260,6 @@ def load_all_csv_datasets(data_dir: Path = RAW_DATA_DIR, exclude: List[str] = No
         logger.info(f"  {class_name:20s}: {count:8,} ({percentage:5.2f}%)")
     
     return combined_df
-
 
 def prepare_data_from_combined_df(df: pd.DataFrame, save_split: bool = True) -> Tuple:
     """
