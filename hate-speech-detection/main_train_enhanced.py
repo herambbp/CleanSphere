@@ -150,7 +150,8 @@ def fix_tokenizer_automatically():
 
 # ==================== DATASET LOADING ====================
 
-def load_all_csv_datasets(data_dir: Path = RAW_DATA_DIR, exclude: List[str] = None) -> pd.DataFrame:
+def load_all_csv_datasets(data_dir: Path = RAW_DATA_DIR, exclude: List[str] = None, 
+                          filter_confidence: bool = False, min_confidence: float = 0.5) -> pd.DataFrame:
     """
     Load and combine ALL CSV files from data/raw directory.
     
@@ -187,6 +188,13 @@ def load_all_csv_datasets(data_dir: Path = RAW_DATA_DIR, exclude: List[str] = No
             # Load CSV
             logger.info(f"  [LOAD] Loading {csv_file.name}...")
             df = pd.read_csv(csv_file, encoding="latin-1", on_bad_lines="skip")
+
+            if filter_confidence and 'confidence' in df.columns:
+                initial_count = len(df)
+                df = df[df['confidence'] >= min_confidence]
+                filtered_count = initial_count - len(df)
+                if filtered_count > 0:
+                    logger.info(f"  [FILTER] Removed {filtered_count:,} low-confidence samples (< {min_confidence})")
             
             # Validate columns
             if 'tweet' not in df.columns or 'class' not in df.columns:

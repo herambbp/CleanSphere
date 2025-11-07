@@ -621,3 +621,16 @@ LIME_CONFIG = {
 SHAP_CONFIG = {
     'max_display': 10         # Max features to display
 }
+
+
+# ==================== MEASURING HATE SPEECH CONFIG ====================
+
+# Conversion strategy (choose based on comparison)
+MHS_CONVERSION_STRATEGY = 'severity_aware'  # or 'balanced', 'strict', 'multi_label'
+
+# Whether to use confidence filtering
+USE_CONFIDENCE_FILTER = True
+MIN_CONFIDENCE = 0.5  # Only use samples with confidence > 0.5
+
+# Whether to keep original scores for severity analysis
+KEEP_ORIGINAL_SCORES = True
