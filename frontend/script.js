@@ -859,7 +859,7 @@ function renderVerification(verification) {
 
   let html = `
         <div class="verification-header">
-            <h4>🤖 Intelligent Verification (GPT-4o-mini)</h4>
+            <h4>Intelligent Verification</h4>
             <span class="badge ${agreementClass}">${agreementText}</span>
         </div>
         
