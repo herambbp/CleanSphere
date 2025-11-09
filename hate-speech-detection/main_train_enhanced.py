@@ -1,19 +1,16 @@
 """
 Enhanced Main Training Script - Hate Speech Detection Project
-COMPLETE VERSION with PyTorch CUDA + Traditional DL + Heavy GPU BERT + Tokenizer Fix
-
-✨ NEW: PyTorch CUDA Integration for 2-3x faster training!
+COMPLETE VERSION with Traditional DL + Heavy GPU BERT + Tokenizer Fix
 
 Supports:
 1. Training on ALL datasets in data/raw
 2. Incremental training (adding new data to existing models)
-3. PyTorch CUDA Deep Learning (LSTM, BiLSTM, CNN) - 2-3x FASTER! ⚡
-4. Traditional Deep Learning (TensorFlow fallback)
-5. Heavy GPU BERT models (BERT-Large, RoBERTa-Large, etc.)
+3. Traditional Deep Learning (LSTM, BiLSTM, CNN, Basic BERT)
+4. Heavy GPU BERT models (BERT-Large, RoBERTa-Large, etc.)
 
 PHASE 1-3: Traditional ML Models + Embeddings
 PHASE 4: Severity Classification System
-PHASE 5A: Deep Learning (PyTorch CUDA > TensorFlow)
+PHASE 5A: Traditional Deep Learning (LSTM, BiLSTM, CNN, Basic BERT)
 PHASE 5B: Heavy GPU BERT (BERT-Large, RoBERTa-Large, etc.)
 """
 
@@ -36,55 +33,15 @@ from models.traditional_ml_trainer import train_traditional_models
 from reporting import TrainingHistory, MetricsCollector, QuickReportGenerator
 
 
-# ==================== PHASE 5A: DEEP LEARNING TRAINER SELECTION ====================
-# Import Phase 5A modules - Auto-detect best available framework
-# Priority: PyTorch CUDA > TensorFlow (PyTorch is 2-3x faster!)
-
-HAS_PYTORCH = False
-HAS_TENSORFLOW = False
-HAS_TRADITIONAL_DL = False
-DL_FRAMEWORK = None
-
-# Try PyTorch first (RECOMMENDED - 2-3x faster with CUDA!)
+# Import Phase 5A modules - Traditional Deep Learning
 try:
-    from pytorch_trainer import train_deep_learning_models, HAS_PYTORCH as PYTORCH_AVAILABLE
-    if PYTORCH_AVAILABLE:
-        HAS_PYTORCH = True
-        HAS_TRADITIONAL_DL = True
-        DL_FRAMEWORK = "PyTorch CUDA"
-        logger.info("=" * 80)
-        logger.info("[SUCCESS] PyTorch CUDA deep learning trainer loaded!")
-        logger.info("[SPEED] Using PyTorch for 2-3x faster training! ⚡")
-        logger.info("[GPU] CUDA acceleration enabled")
-        logger.info("=" * 80)
-except ImportError as e:
-    logger.info("[INFO] PyTorch trainer not available, checking TensorFlow...")
-    logger.debug(f"PyTorch import error: {e}")
+    from models.deep_learning_trainer import train_deep_learning_models, HAS_TENSORFLOW
+    HAS_TRADITIONAL_DL = True
+except ImportError:
+    HAS_TRADITIONAL_DL = False
+    HAS_TENSORFLOW = False
+    logger.warning("Traditional deep learning modules not available.")
 
-# Fall back to TensorFlow if PyTorch not available
-if not HAS_TRADITIONAL_DL:
-    try:
-        from models.deep_learning_trainer import train_deep_learning_models, HAS_TENSORFLOW
-        if HAS_TENSORFLOW:
-            HAS_TENSORFLOW = True
-            HAS_TRADITIONAL_DL = True
-            DL_FRAMEWORK = "TensorFlow"
-            logger.info("=" * 80)
-            logger.info("[OK] TensorFlow deep learning trainer loaded")
-            logger.warning("[TIP] Want 2-3x faster training? Install PyTorch CUDA:")
-            logger.warning("      pip install torch --index-url https://download.pytorch.org/whl/cu118")
-            logger.info("=" * 80)
-    except ImportError:
-        logger.warning("=" * 80)
-        logger.warning("[WARNING] No deep learning framework available!")
-        logger.warning("[INSTALL] Choose one:")
-        logger.warning("  PyTorch (RECOMMENDED - 2-3x faster):")
-        logger.warning("    pip install torch --index-url https://download.pytorch.org/whl/cu118")
-        logger.warning("  TensorFlow:")
-        logger.warning("    pip install tensorflow")
-        logger.warning("=" * 80)
-
-# ==================== PHASE 5B: HEAVY GPU BERT ====================
 # Import Phase 5B modules - Heavy GPU BERT
 try:
     from bert_integration import (
@@ -108,14 +65,7 @@ def fix_tokenizer_automatically():
     """
     Automatically fix tokenizer before training traditional deep learning models.
     This ensures LSTM/BiLSTM/CNN models can load the tokenizer properly.
-    
-    Note: Only needed for TensorFlow. PyTorch handles tokenization differently.
     """
-    # Skip for PyTorch - it handles tokenization internally
-    if HAS_PYTORCH and DL_FRAMEWORK == "PyTorch CUDA":
-        logger.info("[INFO] Using PyTorch - tokenizer handled automatically")
-        return True
-    
     print_section_header("CHECKING AND FIXING TOKENIZER")
     
     tokenizer_path = Path('saved_models/deep_learning/tokenizer.pkl')
@@ -725,7 +675,7 @@ def phase1_train_traditional_ml(
         sys.exit(1)
 
 
-# ==================== PHASE 5A: DEEP LEARNING ====================
+# ==================== PHASE 5A: TRADITIONAL DEEP LEARNING ====================
 
 def phase5a_train_traditional_dl(
     X_train=None, X_val=None, X_test=None,
@@ -733,26 +683,20 @@ def phase5a_train_traditional_dl(
     use_bert: bool = False
 ):
     """
-    Phase 5A: Train deep learning models (LSTM, BiLSTM, CNN).
-    Auto-detects best framework: PyTorch CUDA (2-3x faster) > TensorFlow
+    Phase 5A: Train traditional deep learning models (LSTM, BiLSTM, CNN, Basic BERT).
     
     Args:
         X_train, X_val, X_test, y_train, y_val, y_test: Data splits
-        use_bert: Whether to include Basic BERT (only for TensorFlow)
+        use_bert: Whether to include Basic BERT (not Heavy GPU BERT)
     
     Returns:
         DeepLearningTrainer instance or None
     """
-    framework_name = DL_FRAMEWORK or "Deep Learning"
-    print_section_header(f"PHASE 5A: {framework_name.upper()} (LSTM, BiLSTM, CNN)")
+    print_section_header("PHASE 5A: TRADITIONAL DEEP LEARNING (LSTM, BiLSTM, CNN)")
     
     if not HAS_TRADITIONAL_DL:
-        logger.error("[ERROR] No deep learning framework available!")
-        logger.error("[INSTALL] Choose one:")
-        logger.error("  PyTorch CUDA (RECOMMENDED - 2-3x faster):")
-        logger.error("    pip install torch --index-url https://download.pytorch.org/whl/cu118")
-        logger.error("  TensorFlow:")
-        logger.error("    pip install tensorflow")
+        logger.error("[ERROR] Traditional deep learning modules not available!")
+        logger.error("Install with: pip install tensorflow keras")
         return None
     
     # Check if data is provided
@@ -761,37 +705,18 @@ def phase5a_train_traditional_dl(
         logger.error("Run Phase 1-3 first or provide data splits")
         return None
     
-    # Display framework info
-    logger.info("=" * 80)
-    logger.info(f"[FRAMEWORK] Using: {DL_FRAMEWORK}")
-    if HAS_PYTORCH:
-        logger.info("[SPEED] PyTorch CUDA - 2-3x faster than TensorFlow! ⚡")
-        logger.info("[GPU] CUDA acceleration enabled")
-    elif HAS_TENSORFLOW:
-        logger.info("[TIP] Want 2-3x speedup? Install PyTorch CUDA:")
-        logger.info("      pip install torch --index-url https://download.pytorch.org/whl/cu118")
-    logger.info("=" * 80)
+    # Fix tokenizer before training
+    logger.info("\n[TOKENIZER] Checking tokenizer before training...")
+    tokenizer_ok = fix_tokenizer_automatically()
     
-    # Fix tokenizer before training (TensorFlow only)
-    if HAS_TENSORFLOW and not HAS_PYTORCH:
-        logger.info("\n[TOKENIZER] Checking tokenizer before training...")
-        tokenizer_ok = fix_tokenizer_automatically()
-        
-        if not tokenizer_ok:
-            logger.warning("[WARN] Tokenizer check failed but will attempt training anyway")
+    if not tokenizer_ok:
+        logger.warning("[WARN] Tokenizer check failed but will attempt training anyway")
     
-    logger.info(f"\n[INFO] Training deep learning models")
-    logger.info(f"[INFO] Models: LSTM, BiLSTM, CNN" + (" + Basic BERT" if use_bert and HAS_TENSORFLOW else ""))
+    logger.info(f"\n[INFO] Training traditional deep learning models")
+    logger.info(f"[INFO] Models: LSTM, BiLSTM, CNN" + (" + Basic BERT" if use_bert else ""))
     logger.info(f"[INFO] Training samples: {len(X_train):,}")
     logger.info(f"[INFO] Validation samples: {len(X_val):,}")
     logger.info(f"[INFO] Test samples: {len(X_test):,}")
-    
-    # PyTorch doesn't support basic BERT in this implementation
-    if use_bert and HAS_PYTORCH:
-        logger.warning("[WARN] Basic BERT not supported in PyTorch version")
-        logger.warning("[WARN] Training LSTM, BiLSTM, CNN only")
-        logger.info("[TIP] For BERT, use --use-bert flag with heavy GPU BERT models")
-        use_bert = False
     
     # Train models
     try:
@@ -806,7 +731,7 @@ def phase5a_train_traditional_dl(
         )
         
         if trainer:
-            logger.info(f"\n[SUCCESS] Phase 5A {DL_FRAMEWORK} training complete!")
+            logger.info("\n[SUCCESS] Phase 5A Traditional DL training complete!")
             
             # Get best model
             try:
@@ -814,11 +739,6 @@ def phase5a_train_traditional_dl(
                 best_metrics = trainer.get_best_metrics()
                 logger.info(f"[BEST MODEL] {best_model_name}")
                 logger.info(f"[TEST ACCURACY] {best_metrics.get('test_accuracy', 0):.4f}")
-                
-                if HAS_PYTORCH:
-                    logger.info(f"[SAVED] Models in: saved_models/pytorch_dl/")
-                else:
-                    logger.info(f"[SAVED] Models in: saved_models/deep_learning/")
             except:
                 logger.warning("Could not retrieve best model info")
         
@@ -934,9 +854,9 @@ def main(
     Args:
         skip_phase1: Skip Phase 1-3 (traditional ML)
         skip_phase4: Skip Phase 4 (severity testing)
-        run_phase5_traditional: Run Phase 5A (LSTM, BiLSTM, CNN)
+        run_phase5_traditional: Run Phase 5A (LSTM, BiLSTM, CNN, Basic BERT)
         run_phase5_bert: Run Phase 5B (Heavy GPU BERT)
-        use_bert_in_traditional: Include Basic BERT in Phase 5A (TensorFlow only)
+        use_bert_in_traditional: Include Basic BERT in Phase 5A
         phase5_bert_models: List of BERT models for Phase 5B (e.g., ['bert-large', 'roberta-large'])
         use_ensemble: Use ensemble prediction in Phase 5B
         incremental: Use incremental training mode
@@ -945,18 +865,12 @@ def main(
     
     print("=" * 80)
     print("HATE SPEECH DETECTION - ENHANCED TRAINING PIPELINE")
-    if HAS_PYTORCH:
-        print("⚡ PYTORCH CUDA ENABLED - 2-3X FASTER TRAINING! ⚡")
     print("=" * 80)
     print(f"Project Root: {PROJECT_ROOT}")
     print(f"Mode: {'INCREMENTAL' if incremental else 'FULL TRAINING'}")
     print(f"Load all datasets: {load_all_datasets}")
-    print(f"Deep Learning Framework: {DL_FRAMEWORK or 'None'}")
-    if HAS_PYTORCH:
-        print(f"PyTorch CUDA: Available ✓ (2-3x faster!)")
-    elif HAS_TENSORFLOW:
-        print(f"TensorFlow: Available ✓")
-    print(f"Heavy GPU BERT: {'Available ✓' if HAS_HEAVY_BERT else 'Not Available'}")
+    print(f"Traditional DL available: {HAS_TRADITIONAL_DL}")
+    print(f"Heavy GPU BERT available: {HAS_HEAVY_BERT}")
     print("=" * 80)
     
     # Check if data files exist
@@ -1014,7 +928,7 @@ def main(
         logger.info("[SKIP] Skipping Phase 4 (Severity System)")
         phase4_success = None
     
-    # Phase 5A: Deep Learning (PyTorch CUDA or TensorFlow)
+    # Phase 5A: Traditional Deep Learning
     trainer_trad_dl = None
     if run_phase5_traditional:
         if X_train is None:
@@ -1031,10 +945,8 @@ def main(
                 use_bert=use_bert_in_traditional
             )
     else:
-        logger.info("\n[SKIP] Skipping Phase 5A (Deep Learning)")
+        logger.info("\n[SKIP] Skipping Phase 5A (Traditional Deep Learning)")
         logger.info("Use --phase5 flag to enable LSTM, BiLSTM, CNN training")
-        if HAS_PYTORCH:
-            logger.info("[TIP] PyTorch CUDA is available - training will be 2-3x faster!")
     
     # Phase 5B: Heavy GPU BERT
     trainer_bert = None
@@ -1098,14 +1010,11 @@ def main(
         print("  [OK] Phase 4: Severity Classification + Action Recommendations")
     
     if run_phase5_traditional and trainer_trad_dl:
-        framework_emoji = "⚡" if HAS_PYTORCH else ""
-        print(f"  [OK] Phase 5A: {DL_FRAMEWORK} (LSTM, BiLSTM, CNN) {framework_emoji}")
+        print("  [OK] Phase 5A: Traditional Deep Learning (LSTM, BiLSTM, CNN)")
         try:
             best_name = trainer_trad_dl.get_best_model_name()
             best_metrics = trainer_trad_dl.get_best_metrics()
             print(f"     Best: {best_name} ({best_metrics.get('test_accuracy', 0):.4f} accuracy)")
-            if HAS_PYTORCH:
-                print(f"     Saved in: saved_models/pytorch_dl/")
         except:
             pass
     
@@ -1116,8 +1025,6 @@ def main(
     
     print("\n[OUTPUT LOCATIONS]")
     print(f"  Models: {PROJECT_ROOT / 'saved_models'}")
-    if HAS_PYTORCH and run_phase5_traditional:
-        print(f"  PyTorch DL: {PROJECT_ROOT / 'saved_models' / 'pytorch_dl'}")
     print(f"  Features: {PROJECT_ROOT / 'saved_features'}")
     print(f"  Results: {PROJECT_ROOT / 'results'}")
     print(f"  Reports: {PROJECT_ROOT / 'results/training_reports'}")
@@ -1136,20 +1043,14 @@ def main(
     print("     classifier = TweetClassifier()")
     print("     result = classifier.classify_with_severity('Your tweet')")
     
-    if HAS_PYTORCH and run_phase5_traditional:
-        print("\n  3. Use PyTorch CUDA models:")
-        print("     from pytorch_trainer import load_pytorch_model")
-        print("     predictor = load_pytorch_model('bilstm')")
-        print("     predictions = predictor.predict(sequences)")
-    
     if HAS_HEAVY_BERT and run_phase5_bert:
-        print("\n  4. Use Heavy GPU BERT model:")
+        print("\n  3. Use Heavy GPU BERT model:")
         print("     from bert_model_heavy_gpu import HeavyGPUBERTModel")
         print("     model = HeavyGPUBERTModel.load('saved_models/bert_bert_large')")
         print("     predictions = model.predict(texts)")
     
     if incremental:
-        print("\n  5. Add more datasets:")
+        print("\n  4. Add more datasets:")
         print("     - Place new CSV files in data/raw/")
         print("     - Run: python main_train_enhanced.py --incremental")
     
@@ -1160,7 +1061,7 @@ def main(
 
 def print_usage():
     """Print usage examples."""
-    usage_text = """
+    print("""
 USAGE EXAMPLES:
 ===============
 
@@ -1168,70 +1069,52 @@ BASIC USAGE (Phase 1-4 only):
 1. Train traditional ML + severity system:
    python main_train_enhanced.py
 
-PHASE 5A - DEEP LEARNING (PyTorch CUDA or TensorFlow):
-2. Train traditional ML + deep learning:
+PHASE 5A - TRADITIONAL DEEP LEARNING (LSTM, BiLSTM, CNN):
+2. Train traditional ML + traditional DL:
    python main_train_enhanced.py --phase5
-   
-   ⚡ If PyTorch is installed: 2-3x FASTER training!
-   📊 If TensorFlow only: Normal speed
 
-3. Skip traditional ML, only train deep learning:
+3. Train traditional ML + traditional DL + Basic BERT:
+   python main_train_enhanced.py --phase5 --use-bert
+
+4. Skip traditional ML, only train deep learning:
    python main_train_enhanced.py --skip-phase1 --phase5
 
 PHASE 5B - HEAVY GPU BERT:
-4. Train with BERT-Large:
+5. Train with BERT-Large:
    python main_train_enhanced.py --use-bert bert-large
 
-5. Train multiple heavy models and compare:
+6. Train multiple heavy models and compare:
    python main_train_enhanced.py --use-bert bert-large roberta-base
 
-6. Use ensemble for best accuracy:
+7. Use ensemble for best accuracy:
    python main_train_enhanced.py --use-bert bert-large roberta-base --ensemble
 
 COMBINED PHASES:
-7. Train everything (Traditional ML + DL + Heavy BERT):
+8. Train everything (Traditional ML + Traditional DL + Heavy BERT):
    python main_train_enhanced.py --phase5 --use-bert bert-large
 
-8. Train all DL models (Deep Learning + Heavy BERT):
+9. Train all DL models (Traditional DL + Heavy BERT):
    python main_train_enhanced.py --skip-phase1 --phase5 --use-bert bert-large
 
-9. Complete pipeline with ensemble:
-   python main_train_enhanced.py --phase5 --use-bert bert-large roberta-base --ensemble
+10. Complete pipeline with ensemble:
+    python main_train_enhanced.py --phase5 --use-bert bert-large roberta-base --ensemble
 
 SKIP OPTIONS:
-10. Skip traditional ML:
+11. Skip traditional ML:
     python main_train_enhanced.py --skip-phase1 --phase5
 
-11. Skip severity system:
+12. Skip severity system:
     python main_train_enhanced.py --skip-phase4
 
+13. Skip both:
+    python main_train_enhanced.py --skip-phase1 --skip-phase4 --phase5
+
 INCREMENTAL TRAINING:
-12. Add new dataset:
+14. Add new dataset:
     python main_train_enhanced.py --incremental
 
-13. Incremental with deep learning:
+15. Incremental with deep learning:
     python main_train_enhanced.py --incremental --phase5 --use-bert bert-large
-
-════════════════════════════════════════════════════════════════
-
-✨ NEW: PyTorch CUDA Integration!
-════════════════════════════════════════════════════════════════
-
-INSTALL PyTorch CUDA (RECOMMENDED for 2-3x speedup):
-  pip install torch --index-url https://download.pytorch.org/whl/cu118
-
-WHY PyTorch?
-  ⚡ 2-3x faster training on GPU
-  🎯 Same accuracy as TensorFlow  
-  💾 Lower memory usage
-  📈 Better GPU utilization (85-98% vs 60-75%)
-
-WHAT HAPPENS:
-  • If PyTorch installed: Auto-uses PyTorch (FASTER!)
-  • If only TensorFlow: Uses TensorFlow (normal speed)
-  • Script automatically selects best available framework
-
-════════════════════════════════════════════════════════════════
 
 AVAILABLE HEAVY BERT MODELS:
 - bert-base          (110M params) - Fast baseline
@@ -1246,19 +1129,15 @@ AVAILABLE HEAVY BERT MODELS:
 
 DATASET FORMAT:
 Each CSV must have these columns:
-- tweet or text: Text content
+- tweet: Text content
 - class: Label (0=Hate, 1=Offensive, 2=Neither)
 
 GPU REQUIREMENTS:
-- PyTorch CUDA DL:    4-8GB GPU (RECOMMENDED)
-- TensorFlow DL:      4-8GB GPU
-- bert-base:          8GB+ GPU
-- bert-large:         16GB+ GPU [RECOMMENDED for RTX 3060]
-- roberta-large:      24GB+ GPU
-
-════════════════════════════════════════════════════════════════
-"""
-    print(usage_text)
+- Traditional DL (LSTM/CNN): 4-8GB GPU
+- bert-base:      8GB+ GPU
+- bert-large:     16GB+ GPU [RECOMMENDED for RTX 3060]
+- roberta-large:  24GB+ GPU
+""")
 
 
 # ==================== RUN ====================
@@ -1267,7 +1146,7 @@ if __name__ == "__main__":
     import argparse
     
     parser = argparse.ArgumentParser(
-        description='Enhanced Hate Speech Detection Training - Complete Pipeline with PyTorch CUDA!'
+        description='Enhanced Hate Speech Detection Training - Complete Pipeline'
     )
     
     # Training modes
@@ -1282,9 +1161,9 @@ if __name__ == "__main__":
     parser.add_argument('--skip-phase4', action='store_true',
                        help='Skip Phase 4 (Severity System)')
     
-    # Phase 5A options - Deep Learning
+    # Phase 5A options - Traditional Deep Learning
     parser.add_argument('--phase5', action='store_true',
-                       help='Run Phase 5A (LSTM, BiLSTM, CNN with PyTorch CUDA or TensorFlow)')
+                       help='Run Phase 5A (LSTM, BiLSTM, CNN, optionally Basic BERT)')
     
     # Phase 5B options - Heavy GPU BERT
     parser.add_argument('--use-bert', nargs='*',
@@ -1299,46 +1178,11 @@ if __name__ == "__main__":
                        help='List all datasets in data/raw/')
     parser.add_argument('--list-models', action='store_true',
                        help='List available BERT models')
-    parser.add_argument('--check-pytorch', action='store_true',
-                       help='Check if PyTorch CUDA is available')
     
     args = parser.parse_args()
     
     if args.usage:
         print_usage()
-    elif args.check_pytorch:
-        print("\n" + "=" * 80)
-        print("PYTORCH CUDA AVAILABILITY CHECK")
-        print("=" * 80)
-        if HAS_PYTORCH:
-            try:
-                import torch
-                print("[SUCCESS] PyTorch is installed!")
-                print(f"  Version: {torch.__version__}")
-                print(f"  CUDA Available: {torch.cuda.is_available()}")
-                if torch.cuda.is_available():
-                    print(f"  CUDA Version: {torch.version.cuda}")
-                    print(f"  GPU: {torch.cuda.get_device_name(0)}")
-                    print(f"  GPU Memory: {torch.cuda.get_device_properties(0).total_memory / 1e9:.2f} GB")
-                    print("\n⚡ Ready for 2-3x faster training!")
-                else:
-                    print("\n[WARNING] CUDA not available - will use CPU")
-                    print("[TIP] Reinstall with CUDA support:")
-                    print("  pip install torch --index-url https://download.pytorch.org/whl/cu118")
-            except Exception as e:
-                print(f"[ERROR] {e}")
-        elif HAS_TENSORFLOW:
-            print("[INFO] PyTorch not installed, using TensorFlow")
-            print("\n[TIP] Want 2-3x speedup? Install PyTorch CUDA:")
-            print("  pip install torch --index-url https://download.pytorch.org/whl/cu118")
-        else:
-            print("[ERROR] No deep learning framework installed!")
-            print("\n[INSTALL] Choose one:")
-            print("  PyTorch CUDA (RECOMMENDED - 2-3x faster):")
-            print("    pip install torch --index-url https://download.pytorch.org/whl/cu118")
-            print("  TensorFlow:")
-            print("    pip install tensorflow")
-        print("=" * 80)
     elif args.list_models:
         print("\n[AVAILABLE BERT MODELS FOR HEAVY GPU]")
         print("=" * 60)
