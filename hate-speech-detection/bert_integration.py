@@ -357,6 +357,108 @@ class HeavyGPUBERTTrainer:
             raise ValueError(f"Unknown ensemble method: {method}")
         
         return predictions
+    
+    def save_metadata(self):
+    """Save Heavy GPU BERT training metadata to dl_model_metadata.json."""
+    import json
+    from config import RESULTS_DIR
+    
+    logger.info("Saving Heavy GPU BERT metadata to dl_model_metadata.json...")
+    
+    if not self.trained_models:
+        logger.warning("No trained models to save metadata for")
+        return
+    
+    metadata_path = RESULTS_DIR / 'dl_model_metadata.json'
+    
+    # Load existing metadata if it exists
+    existing_metadata = {}
+    if metadata_path.exists():
+        try:
+            with open(metadata_path, 'r') as f:
+                existing_metadata = json.load(f)
+            logger.info("Loaded existing dl_model_metadata.json")
+        except Exception as e:
+            logger.warning(f"Could not load existing metadata: {e}")
+            existing_metadata = {}
+    
+    # Prepare BERT results
+    bert_results = {}
+    for model_name, result in self.trained_models.items():
+        test_metrics = result.get('test_metrics')
+        if test_metrics:
+            bert_results[model_name] = {
+                'accuracy': float(test_metrics['accuracy']),
+                'f1_macro': float(test_metrics['f1_macro']),
+                'f1_weighted': float(test_metrics['f1_weighted']),
+                'precision_macro': float(test_metrics['precision_macro']),
+                'recall_macro': float(test_metrics['recall_macro']),
+                'training_time': float(result['training_time']),
+                'training_time_minutes': float(result['training_time'] / 60),
+                'val_accuracy': float(result['val_accuracy']),
+                'total_params': int(result['model_info']['total_params']),
+                'model_type': 'Heavy GPU BERT',
+                'bert_variant': result['model_name']
+            }
+    
+    # Update existing metadata with BERT results
+    if 'all_results' not in existing_metadata:
+        existing_metadata['all_results'] = {}
+    
+    # Add BERT models to all_results
+    existing_metadata['all_results'].update(bert_results)
+    
+    # Update models list
+    if 'models' not in existing_metadata:
+        existing_metadata['models'] = []
+    
+    for model_name in bert_results.keys():
+        if model_name not in existing_metadata['models']:
+            existing_metadata['models'].append(model_name)
+    
+    # Update num_models_trained
+    existing_metadata['num_models_trained'] = len(existing_metadata.get('models', []))
+    
+    # Find overall best model (comparing all DL models including BERT)
+    all_results = existing_metadata.get('all_results', {})
+    if all_results:
+        best_model_name = max(
+            all_results.items(),
+            key=lambda x: x[1].get('f1_macro', 0)
+        )[0]
+        
+        best_model_metrics = all_results[best_model_name]
+        
+        existing_metadata['best_model'] = {
+            'name': best_model_name,
+            'accuracy': float(best_model_metrics['accuracy']),
+            'f1_macro': float(best_model_metrics['f1_macro']),
+            'f1_weighted': float(best_model_metrics['f1_weighted'])
+        }
+        
+        logger.info(f"Overall best model: {best_model_name} (F1 Macro: {best_model_metrics['f1_macro']:.4f})")
+    
+    # Add framework info
+    if 'frameworks' not in existing_metadata:
+        existing_metadata['frameworks'] = []
+    
+    if 'PyTorch (Heavy GPU BERT)' not in existing_metadata['frameworks']:
+        existing_metadata['frameworks'].append('PyTorch (Heavy GPU BERT)')
+    
+    # Save updated metadata
+    try:
+        RESULTS_DIR.mkdir(parents=True, exist_ok=True)
+        with open(metadata_path, 'w') as f:
+            json.dump(existing_metadata, f, indent=2)
+        
+        logger.info(f"[SUCCESS] Metadata saved to {metadata_path}")
+        logger.info(f"  Total models: {existing_metadata['num_models_trained']}")
+        logger.info(f"  BERT models added: {len(bert_results)}")
+        
+    except Exception as e:
+        logger.error(f"Failed to save metadata: {e}")
+        import traceback
+        traceback.print_exc()
 
 
 # ==================== INTEGRATION WITH MAIN TRAINING PIPELINE ====================
@@ -381,7 +483,7 @@ def train_heavy_gpu_bert(
         y_val: Validation labels
         X_test: Test texts
         y_test: Test labels
-        model_names: List of models to train (default: bert-large, roberta-large)
+        model_names: List of models to train (default: bert-large, roberta-base)
         use_ensemble: Whether to use ensemble prediction
     
     Returns:
@@ -405,8 +507,8 @@ def train_heavy_gpu_bert(
     
     # Default models - using larger models since we have heavy GPU
     if model_names is None:
-        model_names = ['bert-large', 'roberta-base']  # Start with these two
-        logger.info("Using default models: bert-large, roberta-base")
+        model_names = ['bert-base']  # Changed default to bert-base (best performing)
+        logger.info("Using default model: bert-base (best performing)")
     
     # Convert numpy arrays to lists if needed
     if isinstance(X_train, np.ndarray):
@@ -430,6 +532,9 @@ def train_heavy_gpu_bert(
         y_test=y_test
     )
     
+    # Save metadata to dl_model_metadata.json
+    trainer.save_metadata()
+    
     # Test ensemble if requested
     if use_ensemble and len(results) > 1:
         logger.info("\n" + "="*80)
@@ -452,12 +557,11 @@ def train_heavy_gpu_bert(
         logger.info(f"  Accuracy: {trainer.best_accuracy:.4f}")
         
         if ensemble_acc > trainer.best_accuracy:
-            logger.info(f"\n Ensemble is better by {ensemble_acc - trainer.best_accuracy:.4f}!")
+            logger.info(f"\n✓ Ensemble is better by {ensemble_acc - trainer.best_accuracy:.4f}!")
         
         logger.info("="*80 + "\n")
     
     return trainer
-
 
 # ==================== QUICK TRAINING PRESETS ====================
 
@@ -577,3 +681,5 @@ if __name__ == "__main__":
     
     print("\n Integration module test complete")
     print("="*80)
+
+

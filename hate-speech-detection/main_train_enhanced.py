@@ -1053,11 +1053,22 @@ def main(
                 models=phase5_bert_models,
                 use_ensemble=use_ensemble
             )
+            
+            if trainer_bert:
+                logger.info("\n[SUCCESS] Phase 5B Heavy GPU BERT training complete!")
+                logger.info("[METADATA] Results saved to dl_model_metadata.json")
+                
+                # Get best model
+                try:
+                    best_name, best_model = trainer_bert.get_best_model()
+                    logger.info(f"[BEST MODEL] {best_name}")
+                    logger.info(f"[TEST ACCURACY] {trainer_bert.best_accuracy:.4f}")
+                except:
+                    logger.warning("Could not retrieve best model info")
     else:
         logger.info("\n[SKIP] Skipping Phase 5B (Heavy GPU BERT)")
         logger.info("Use --use-bert flag to enable Heavy GPU BERT training")
-        logger.info("Available models: bert-large, roberta-large, distilbert, etc.")
-    
+        logger.info("Available models: bert-base, bert-large, roberta-base, roberta-large, distilbert, etc.")
     # Test the classifier
     if not skip_phase1 or not skip_phase4:
         try:
