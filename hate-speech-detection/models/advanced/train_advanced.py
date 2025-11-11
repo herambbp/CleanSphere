@@ -387,6 +387,73 @@ class AdvancedModelsTrainer:
         
         return best_name, best_model
 
+# Add to AdvancedModelsTrainer class
+def save_metadata_to_dl_json(self):
+    """Save results to dl_model_metadata.json for consistency with other phases."""
+    from config import RESULTS_DIR
+    import json
+    from pathlib import Path
+    
+    # Load existing metadata if it exists
+    metadata_path = RESULTS_DIR / 'dl_model_metadata.json'
+    if metadata_path.exists():
+        with open(metadata_path, 'r') as f:
+            existing_metadata = json.load(f)
+    else:
+        existing_metadata = {}
+    
+    # Prepare advanced models metadata
+    advanced_metadata = {
+        'num_models_trained': len(self.trained_models),
+        'models': list(self.trained_models.keys()),
+        'advanced_models': True,  # Flag to indicate these are advanced
+        'best_model': None,
+        'all_results': {}
+    }
+    
+    # Add individual model results
+    for model_name, result in self.results.items():
+        if result and 'test_metrics' in result:
+            metrics = result['test_metrics']
+            advanced_metadata['all_results'][f'advanced_{model_name}'] = {
+                'accuracy': metrics.get('accuracy', 0),
+                'f1_macro': metrics.get('f1_macro', 0),
+                'f1_weighted': metrics.get('f1_weighted', 0),
+                'training_time': result.get('training_time', 0)
+            }
+    
+    # Find best model
+    if self.results:
+        best_name, best_metrics = max(
+            [(k, v['test_metrics']) for k, v in self.results.items() if v],
+            key=lambda x: x[1].get('f1_macro', 0)
+        )
+        advanced_metadata['best_model'] = {
+            'name': f'advanced_{best_name}',
+            'accuracy': best_metrics.get('accuracy', 0),
+            'f1_macro': best_metrics.get('f1_macro', 0),
+            'f1_weighted': best_metrics.get('f1_weighted', 0)
+        }
+    
+    # Merge with existing metadata
+    existing_metadata['advanced_models'] = advanced_metadata
+    
+    # If this is better than previous best, update overall best
+    if advanced_metadata['best_model']:
+        current_best_f1 = advanced_metadata['best_model']['f1_macro']
+        
+        if 'best_model' not in existing_metadata or \
+           current_best_f1 > existing_metadata['best_model'].get('f1_macro', 0):
+            existing_metadata['best_model'] = advanced_metadata['best_model']
+            existing_metadata['best_model']['phase'] = 'Phase 6: Advanced Models'
+    
+    # Save updated metadata
+    metadata_path.parent.mkdir(parents=True, exist_ok=True)
+    with open(metadata_path, 'w') as f:
+        json.dump(existing_metadata, f, indent=2)
+    
+    logger.info(f"Advanced models metadata saved to {metadata_path}")
+    return metadata_path
 # ==================== MAIN TRAINING FUNCTION ====================
 
 def train_advanced_models(
@@ -402,7 +469,8 @@ def train_advanced_models(
     ensemble_method: str = 'weighted_voting',
     create_cv_ensemble: bool = False,
     cv_model_type: str = 'hatebert',
-    cv_n_folds: int = 5
+    cv_n_folds: int = 5,
+    save_to_dl_metadata=True,
 ):
     """
     Main function to train advanced models.
@@ -482,6 +550,9 @@ def train_advanced_models(
     if best_name:
         logger.info(f"\nBest model: {best_name}")
         logger.info(f"  F1 (macro): {trainer.results[best_name]['f1_macro']:.4f}")
+
+    if save_to_dl_metadata:
+        trainer.save_metadata_to_dl_json()
     
     return trainer
 
