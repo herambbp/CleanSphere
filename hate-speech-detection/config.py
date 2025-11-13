@@ -551,17 +551,22 @@ SAVE_ALL_MODELS = True
 # Model file names
 MODEL_FILES = {
     # Traditional ML Models
-    'random_forest': TRADITIONAL_ML_DIR / 'random_forest.pkl',
+    'randomforest': TRADITIONAL_ML_DIR / 'randomforest.pkl',
+    'random_forest': TRADITIONAL_ML_DIR / 'randomforest.pkl',  # Alias for compatibility
     'xgboost': TRADITIONAL_ML_DIR / 'xgboost.pkl',
     'svm': TRADITIONAL_ML_DIR / 'svm.pkl',
-    'gradient_boost': TRADITIONAL_ML_DIR / 'gradient_boost.pkl',
+    'gradientboosting': TRADITIONAL_ML_DIR / 'gradientboosting.pkl',
+    'gradient_boost': TRADITIONAL_ML_DIR / 'gradientboosting.pkl',  # Alias for compatibility
     'mlp': TRADITIONAL_ML_DIR / 'neural_network.pkl',
-    
+    'neural_network': TRADITIONAL_ML_DIR / 'neural_network.pkl',  # Alias for compatibility
+
     # Deep Learning Models (Phase 5)
-    'lstm': DEEP_LEARNING_DIR / 'lstm_model.keras',
-    'bilstm': DEEP_LEARNING_DIR / 'bilstm_model.keras',
-    'cnn': DEEP_LEARNING_DIR / 'cnn_model.keras',
-    'bert': DEEP_LEARNING_DIR / 'bert_model',
+    'lstm': DEEP_LEARNING_DIR / 'lstm_model.pt',
+    'bilstm': DEEP_LEARNING_DIR / 'bilstm_model.pt',
+    'cnn': DEEP_LEARNING_DIR / 'cnn_model_improved.pt',
+    'cnn_improved': DEEP_LEARNING_DIR / 'cnn_model_improved.pt',  # Alias for compatibility
+    'bert': MODELS_DIR / 'bert_bert_base',  # BERT is in its own directory
+    'bert_base': MODELS_DIR / 'bert_bert_base',  # Alias for compatibility
     'tokenizer': DEEP_LEARNING_DIR / 'tokenizer.pkl',
 }
 

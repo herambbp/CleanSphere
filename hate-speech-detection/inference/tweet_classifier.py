@@ -121,13 +121,13 @@ class TweetClassifier:
         """Determine if model is Traditional ML or Deep Learning."""
         if self.model_type != 'auto':
             return
-        
+
         # Check model type (model_name should already be resolved)
         dl_models = ['lstm', 'bilstm', 'cnn', 'bert']
-        trad_models = ['randomforest', 'xgboost', 'svm', 'gradientboosting', 'mlp']
-        
-        model_lower = model_name.lower().replace(' ', '').replace('_', '')
-        
+        trad_models = ['randomforest', 'xgboost', 'svm', 'gradientboosting', 'mlp', 'neural', 'neuralnetwork']
+
+        model_lower = model_name.lower().replace(' ', '').replace('_', '').replace('-', '')
+
         if any(dl in model_lower for dl in dl_models):
             self.model_type = 'deep_learning'
         elif any(trad in model_lower for trad in trad_models):
@@ -211,31 +211,51 @@ class TweetClassifier:
 
     def _load_model(self, model_name: str):
         """Load the specified model (model_name should already be resolved)."""
-        # Get model file path
-        model_key = model_name.lower().replace(' ', '_')
-        
-        if model_key not in MODEL_FILES:
+        # Normalize model name to key format (remove spaces, underscores, lowercase)
+        model_key = model_name.lower().replace(' ', '').replace('_', '').replace('-', '')
+
+        # Map common variations to actual keys
+        key_mappings = {
+            'randomforest': 'randomforest',
+            'gradientboosting': 'gradientboosting',
+            'gradientboost': 'gradientboosting',
+            'neuralnetwork': 'neural_network',
+            'mlp': 'mlp',
+            'xgboost': 'xgboost',
+            'svm': 'svm',
+            'lstm': 'lstm',
+            'bilstm': 'bilstm',
+            'cnn': 'cnn',
+            'cnnimproved': 'cnn',
+            'bert': 'bert',
+            'bertbase': 'bert'
+        }
+
+        # Get the actual key from mapping
+        actual_key = key_mappings.get(model_key, model_key)
+
+        if actual_key not in MODEL_FILES:
             available = [k for k in MODEL_FILES.keys() if k not in ['tokenizer', 'feature_extractor']]
             raise ValueError(
-                f"Model '{model_name}' not found. Available: {available}"
+                f"Model '{model_name}' (key: '{actual_key}') not found. Available: {available}"
             )
-        
-        model_path = MODEL_FILES[model_key]
-        
+
+        model_path = MODEL_FILES[actual_key]
+
         if not model_path.exists():
             raise FileNotFoundError(
                 f"Model file not found: {model_path}. "
                 "Please train the models first."
             )
-        
+
         try:
             if self.model_type == 'deep_learning':
                 # Load deep learning model
-                self._load_dl_model(model_path, model_key)
+                self._load_dl_model(model_path, actual_key)
             else:
                 # Load traditional ML model
                 self.model = joblib.load(model_path)
-            
+
             logger.info(f"Loaded model: {model_name} ({self.model_type})")
         except Exception as e:
             logger.error(f"Error loading model {model_name}: {e}")
@@ -245,58 +265,60 @@ class TweetClassifier:
         """Load a deep learning model."""
         try:
             if 'bert' in model_key:
-                # Load BERT model
+                # Load BERT model (using transformers)
                 from models.deep_learning.bert_model import BERTModel
                 from config import BERT_CONFIG
                 self.model = BERTModel(config=BERT_CONFIG)
                 self.model.load(str(model_path))
-                
-            elif 'cnn' in model_key:
-                # Load CNN model
-                from models.deep_learning.cnn_model import CNNModel
-                from config import CNN_CONFIG
-                
-                # Create model instance
-                self.model = CNNModel(config=CNN_CONFIG)
-                
-                # Load the saved Keras model directly
-                import tensorflow as tf
-                keras_model = tf.keras.models.load_model(str(model_path))
-                self.model.model = keras_model
-                
-                logger.info(f"CNN model loaded successfully from {model_path}")
-                
-            elif 'bilstm' in model_key:
-                # Load BiLSTM model
-                from models.deep_learning.bilstm_model import BiLSTMModel
-                from config import BILSTM_CONFIG
-                
-                self.model = BiLSTMModel(config=BILSTM_CONFIG)
-                
-                # Load the saved Keras model directly
-                import tensorflow as tf
-                keras_model = tf.keras.models.load_model(str(model_path))
-                self.model.model = keras_model
-                
-                logger.info(f"BiLSTM model loaded successfully from {model_path}")
-                
-            elif 'lstm' in model_key:
-                # Load LSTM model
-                from models.deep_learning.lstm_model import LSTMModel
-                from config import LSTM_CONFIG
-                
-                self.model = LSTMModel(config=LSTM_CONFIG)
-                
-                # Load the saved Keras model directly
-                import tensorflow as tf
-                keras_model = tf.keras.models.load_model(str(model_path))
-                self.model.model = keras_model
-                
-                logger.info(f"LSTM model loaded successfully from {model_path}")
-                
+                logger.info(f"BERT model loaded successfully from {model_path}")
+
+            elif model_key in ['cnn', 'lstm', 'bilstm']:
+                # Load PyTorch models (.pt files)
+                import torch
+                from pytorch_dl_models import LSTMClassifier, BiLSTMClassifier, CNNClassifier, PyTorchPredictor
+
+                # Determine device
+                device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+
+                # Load checkpoint
+                checkpoint = torch.load(str(model_path), map_location=device)
+                config = checkpoint['model_config']
+
+                # Create model based on type
+                model_classes = {
+                    'lstm': LSTMClassifier,
+                    'bilstm': BiLSTMClassifier,
+                    'cnn': CNNClassifier
+                }
+
+                model_type = config.get('model_type', model_key)
+                if model_type not in model_classes:
+                    raise ValueError(f"Unknown model type in checkpoint: {model_type}")
+
+                # Create model with config
+                pytorch_model = model_classes[model_type](
+                    vocab_size=config.get('vocab_size', 20000),
+                    embedding_dim=config.get('embedding_dim', 128),
+                    num_classes=config.get('num_classes', 3),
+                    max_length=config.get('max_length', 100),
+                    **{k: v for k, v in config.items()
+                       if k not in ['vocab_size', 'embedding_dim', 'num_classes', 'max_length', 'model_type']}
+                )
+
+                # Load weights
+                pytorch_model.load_state_dict(checkpoint['model_state_dict'])
+                pytorch_model = pytorch_model.to(device)
+                pytorch_model.eval()
+
+                # Wrap in predictor for sklearn-like interface
+                self.model = PyTorchPredictor(pytorch_model, device)
+
+                logger.info(f"{model_key.upper()} (PyTorch) model loaded successfully from {model_path}")
+                logger.info(f"Model device: {device}")
+
             else:
                 raise ValueError(f"Unknown deep learning model type: {model_key}")
-                
+
         except Exception as e:
             logger.error(f"Error loading deep learning model: {e}")
             import traceback
