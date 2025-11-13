@@ -10,3 +10,21 @@ hate-speech-detection/saved_models/
 hate-speech-detection/results/
 data/
 src/scraper/annotator/annotator_debug.log
+
+# Study Notebook Platform
+node_modules/
+package-lock.json
+yarn.lock
+dist/
+build/
+.env.local
+.env.*.local
+logs
+*.log
+npm-debug.log*
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
+coverage/
