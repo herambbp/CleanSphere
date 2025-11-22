@@ -1,5 +1,5 @@
 """
-BiLSTM Model for Hate Speech Classification
+BiLSTM Model for Hate Speech Classification - PyTorch Implementation
 Bidirectional Long Short-Term Memory network
 
 Reads text in both directions (forward and backward) for better context understanding.
@@ -9,188 +9,101 @@ Architecture:
 - Bidirectional LSTM Layer (captures patterns in both directions)
 - Dropout Layers (prevents overfitting)
 - Dense Layers (classification)
+
+GPU Accelerated with CUDA support
 """
 
 import numpy as np
 import time
-from typing import Tuple, Dict, List
+import torch
+import torch.nn as nn
+import torch.optim as optim
+from torch.utils.data import DataLoader, TensorDataset
+from typing import Dict, List, Tuple
 import warnings
 warnings.filterwarnings('ignore')
 
-try:
-    import tensorflow as tf
-    from tensorflow import keras
-    from tensorflow.keras import layers
-    from tensorflow.keras.models import Model, load_model
-    from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint, ReduceLROnPlateau
-    HAS_TENSORFLOW = True
-except ImportError:
-    HAS_TENSORFLOW = False
-
 from config import (
     BILSTM_CONFIG, NUM_CLASSES, MODEL_FILES,
-    EARLY_STOPPING_CONFIG, MODEL_CHECKPOINT_CONFIG,
     USE_EARLY_STOPPING, USE_MODEL_CHECKPOINT, CLASS_WEIGHTS
 )
 
-# ==================== BiLSTM MODEL ====================
+# ==================== BiLSTM NETWORK ====================
+
+class BiLSTMNet(nn.Module):
+    """PyTorch Bidirectional LSTM network architecture."""
+    
+    def __init__(
+        self,
+        vocab_size: int,
+        embedding_dim: int,
+        lstm_units: int,
+        num_classes: int,
+        dropout: float = 0.5
+    ):
+        super(BiLSTMNet, self).__init__()
+        
+        self.embedding = nn.Embedding(vocab_size, embedding_dim, padding_idx=0)
+        self.bilstm = nn.LSTM(
+            embedding_dim,
+            lstm_units,
+            batch_first=True,
+            bidirectional=True,  # Key difference from LSTM
+            dropout=dropout if dropout > 0 else 0
+        )
+        self.dropout1 = nn.Dropout(dropout)
+        # Input size is lstm_units * 2 because of bidirectional
+        self.fc1 = nn.Linear(lstm_units * 2, 64)
+        self.relu = nn.ReLU()
+        self.dropout2 = nn.Dropout(dropout)
+        self.fc2 = nn.Linear(64, num_classes)
+    
+    def forward(self, x):
+        embedded = self.embedding(x)
+        lstm_out, (hidden, cell) = self.bilstm(embedded)
+        # Concatenate last hidden states from both directions
+        hidden_forward = hidden[-2]
+        hidden_backward = hidden[-1]
+        lstm_out = torch.cat((hidden_forward, hidden_backward), dim=1)
+        out = self.dropout1(lstm_out)
+        out = self.fc1(out)
+        out = self.relu(out)
+        out = self.dropout2(out)
+        out = self.fc2(out)
+        return out
+
 
 class BiLSTMModel:
-    """
-    Bidirectional LSTM-based text classifier for hate speech detection.
-    
-    Architecture:
-        Input (sequences)
-            ↓
-        Embedding Layer (trainable word embeddings)
-            ↓
-        Bidirectional LSTM Layer (forward + backward processing)
-            ↓
-        Dropout
-            ↓
-        Dense Layer (ReLU)
-            ↓
-        Dropout
-            ↓
-        Output (Softmax, 3 classes)
-    
-    Key Advantage over LSTM:
-    - Reads text in both directions
-    - Better context understanding
-    - "hate you" vs "you hate" - both directions capture full meaning
-    """
+    """Bidirectional LSTM-based text classifier for hate speech detection."""
     
     def __init__(self, config: Dict = None):
-        """
-        Initialize BiLSTM model.
-        
-        Args:
-            config: Model configuration (uses BILSTM_CONFIG if None)
-        """
-        if not HAS_TENSORFLOW:
-            raise ImportError(
-                "TensorFlow is required for BiLSTM model.\n"
-                "Install with: pip install tensorflow==2.13.0"
-            )
-        
         self.config = config or BILSTM_CONFIG
         self.model = None
         self.history = None
         self.training_time = None
+        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         
-        # Extract config
         self.vocab_size = self.config['vocab_size']
         self.embedding_dim = self.config['embedding_dim']
         self.lstm_units = self.config['lstm_units']
         self.dropout = self.config['dropout']
-        self.recurrent_dropout = self.config['recurrent_dropout']
         self.max_length = self.config['max_length']
         self.batch_size = self.config['batch_size']
         self.epochs = self.config['epochs']
         self.learning_rate = self.config['learning_rate']
+        
+        print(f"[BiLSTM] Using device: {self.device}")
     
     def build_model(self):
-        """
-        Build BiLSTM model architecture.
-        
-        Returns:
-            Compiled Keras model
-        """
-        # Input layer
-        inputs = layers.Input(shape=(self.max_length,), name='input')
-        
-        # Embedding layer (learns word representations)
-        x = layers.Embedding(
-            input_dim=self.vocab_size,
-            output_dim=self.embedding_dim,
-            input_length=self.max_length,
-            name='embedding'
-        )(inputs)
-        
-        # Bidirectional LSTM layer (processes in both directions)
-        # Total output: 2 * lstm_units (forward + backward)
-        x = layers.Bidirectional(
-            layers.LSTM(
-                units=self.lstm_units,
-                dropout=self.dropout,
-                recurrent_dropout=self.recurrent_dropout,
-                return_sequences=False,
-                name='lstm'
-            ),
-            name='bidirectional_lstm'
-        )(x)
-        
-        # Dropout for regularization
-        x = layers.Dropout(self.dropout, name='dropout_1')(x)
-        
-        # Dense layer for feature extraction
-        x = layers.Dense(
-            64,
-            activation='relu',
-            name='dense_1'
-        )(x)
-        
-        # Another dropout
-        x = layers.Dropout(self.dropout, name='dropout_2')(x)
-        
-        # Output layer (3 classes: hate, offensive, neither)
-        outputs = layers.Dense(
-            NUM_CLASSES,
-            activation='softmax',
-            name='output'
-        )(x)
-        
-        # Create model
-        model = Model(inputs=inputs, outputs=outputs, name='BiLSTM_Classifier')
-        
-        # Compile model
-        optimizer = keras.optimizers.Adam(learning_rate=self.learning_rate)
-        
-        model.compile(
-            optimizer=optimizer,
-            loss='sparse_categorical_crossentropy',
-            metrics=['accuracy']
-        )
-        
-        self.model = model
-        return model
-    
-    def get_callbacks(self, checkpoint_path: str = None) -> List:
-        """
-        Get training callbacks.
-        
-        Args:
-            checkpoint_path: Path to save best model
-        
-        Returns:
-            List of callbacks
-        """
-        callbacks = []
-        
-        # Early stopping
-        if USE_EARLY_STOPPING:
-            early_stop = EarlyStopping(**EARLY_STOPPING_CONFIG)
-            callbacks.append(early_stop)
-        
-        # Model checkpoint
-        if USE_MODEL_CHECKPOINT and checkpoint_path:
-            checkpoint = ModelCheckpoint(
-                checkpoint_path,
-                **MODEL_CHECKPOINT_CONFIG
-            )
-            callbacks.append(checkpoint)
-        
-        # Reduce learning rate on plateau
-        reduce_lr = ReduceLROnPlateau(
-            monitor='val_accuracy',
-            factor=0.5,
-            patience=2,
-            min_lr=1e-6,
-            verbose=1
-        )
-        callbacks.append(reduce_lr)
-        
-        return callbacks
+        """Build BiLSTM model architecture."""
+        self.model = BiLSTMNet(
+            vocab_size=self.vocab_size,
+            embedding_dim=self.embedding_dim,
+            lstm_units=self.lstm_units,
+            num_classes=NUM_CLASSES,
+            dropout=self.dropout
+        ).to(self.device)
+        return self.model
     
     def train(
         self,
@@ -200,113 +113,154 @@ class BiLSTMModel:
         y_val: np.ndarray = None,
         verbose: int = 1
     ) -> Dict:
-        """
-        Train the BiLSTM model.
-        
-        Args:
-            X_train: Training sequences (n_samples, max_length)
-            y_train: Training labels (n_samples,)
-            X_val: Validation sequences
-            y_val: Validation labels
-            verbose: Verbosity level (0=silent, 1=progress, 2=one line per epoch)
-        
-        Returns:
-            Training history dictionary
-        """
+        """Train the BiLSTM model."""
         if self.model is None:
             self.build_model()
         
-        # Prepare validation data
-        validation_data = None
+        X_train_tensor = torch.LongTensor(X_train)
+        y_train_tensor = torch.LongTensor(y_train)
+        train_dataset = TensorDataset(X_train_tensor, y_train_tensor)
+        train_loader = DataLoader(train_dataset, batch_size=self.batch_size, shuffle=True)
+        
         if X_val is not None and y_val is not None:
-            validation_data = (X_val, y_val)
-            validation_split = None
+            X_val_tensor = torch.LongTensor(X_val)
+            y_val_tensor = torch.LongTensor(y_val)
+            val_dataset = TensorDataset(X_val_tensor, y_val_tensor)
+            val_loader = DataLoader(val_dataset, batch_size=self.batch_size)
         else:
-            validation_split = self.config.get('validation_split', 0.2)
+            val_loader = None
         
-        # Get callbacks
-        checkpoint_path = str(MODEL_FILES['bilstm'])
-        callbacks = self.get_callbacks(checkpoint_path)
+        criterion = nn.CrossEntropyLoss(
+            weight=torch.FloatTensor(list(CLASS_WEIGHTS.values())).to(self.device)
+        )
+        optimizer = optim.Adam(self.model.parameters(), lr=self.learning_rate)
         
-        # Train model
+        history = {'loss': [], 'accuracy': [], 'val_loss': [], 'val_accuracy': []}
+        best_val_acc = 0
+        patience_counter = 0
+        
         start_time = time.time()
         
-        history = self.model.fit(
-            X_train,
-            y_train,
-            batch_size=self.batch_size,
-            epochs=self.epochs,
-            validation_data=validation_data,
-            validation_split=validation_split,
-            class_weight=CLASS_WEIGHTS,
-            callbacks=callbacks,
-            verbose=verbose
-        )
+        for epoch in range(self.epochs):
+            self.model.train()
+            train_loss = 0
+            train_correct = 0
+            train_total = 0
+            
+            for batch_X, batch_y in train_loader:
+                batch_X = batch_X.to(self.device)
+                batch_y = batch_y.to(self.device)
+                
+                optimizer.zero_grad()
+                outputs = self.model(batch_X)
+                loss = criterion(outputs, batch_y)
+                loss.backward()
+                optimizer.step()
+                
+                train_loss += loss.item()
+                _, predicted = torch.max(outputs.data, 1)
+                train_total += batch_y.size(0)
+                train_correct += (predicted == batch_y).sum().item()
+            
+            epoch_loss = train_loss / len(train_loader)
+            epoch_acc = train_correct / train_total
+            history['loss'].append(epoch_loss)
+            history['accuracy'].append(epoch_acc)
+            
+            if val_loader is not None:
+                self.model.eval()
+                val_loss = 0
+                val_correct = 0
+                val_total = 0
+                
+                with torch.no_grad():
+                    for batch_X, batch_y in val_loader:
+                        batch_X = batch_X.to(self.device)
+                        batch_y = batch_y.to(self.device)
+                        outputs = self.model(batch_X)
+                        loss = criterion(outputs, batch_y)
+                        val_loss += loss.item()
+                        _, predicted = torch.max(outputs.data, 1)
+                        val_total += batch_y.size(0)
+                        val_correct += (predicted == batch_y).sum().item()
+                
+                val_epoch_loss = val_loss / len(val_loader)
+                val_epoch_acc = val_correct / val_total
+                history['val_loss'].append(val_epoch_loss)
+                history['val_accuracy'].append(val_epoch_acc)
+                
+                if USE_EARLY_STOPPING:
+                    if val_epoch_acc > best_val_acc:
+                        best_val_acc = val_epoch_acc
+                        patience_counter = 0
+                        if USE_MODEL_CHECKPOINT:
+                            self.save()
+                    else:
+                        patience_counter += 1
+                        if patience_counter >= 3:
+                            if verbose:
+                                print(f"Early stopping at epoch {epoch+1}")
+                            break
+                
+                if verbose:
+                    print(f"Epoch {epoch+1}/{self.epochs} - "
+                          f"loss: {epoch_loss:.4f} - acc: {epoch_acc:.4f} - "
+                          f"val_loss: {val_epoch_loss:.4f} - val_acc: {val_epoch_acc:.4f}")
+            else:
+                if verbose:
+                    print(f"Epoch {epoch+1}/{self.epochs} - "
+                          f"loss: {epoch_loss:.4f} - acc: {epoch_acc:.4f}")
         
         self.training_time = time.time() - start_time
-        self.history = history.history
-        
+        self.history = history
         return self.history
     
     def predict(self, X: np.ndarray) -> np.ndarray:
-        """
-        Predict class labels.
-        
-        Args:
-            X: Input sequences (n_samples, max_length)
-        
-        Returns:
-            Predicted class labels (n_samples,)
-        """
+        """Predict class labels."""
         if self.model is None:
             raise RuntimeError("Model must be built or loaded before prediction")
         
-        probabilities = self.model.predict(X, verbose=0)
-        predictions = np.argmax(probabilities, axis=1)
+        self.model.eval()
+        X_tensor = torch.LongTensor(X).to(self.device)
+        dataset = TensorDataset(X_tensor)
+        loader = DataLoader(dataset, batch_size=self.batch_size)
         
-        return predictions
+        predictions = []
+        with torch.no_grad():
+            for batch_X, in loader:
+                outputs = self.model(batch_X)
+                _, predicted = torch.max(outputs.data, 1)
+                predictions.extend(predicted.cpu().numpy())
+        
+        return np.array(predictions)
     
     def predict_proba(self, X: np.ndarray) -> np.ndarray:
-        """
-        Predict class probabilities.
-        
-        Args:
-            X: Input sequences (n_samples, max_length)
-        
-        Returns:
-            Class probabilities (n_samples, n_classes)
-        """
+        """Predict class probabilities."""
         if self.model is None:
             raise RuntimeError("Model must be built or loaded before prediction")
         
-        probabilities = self.model.predict(X, verbose=0)
-        return probabilities
+        self.model.eval()
+        X_tensor = torch.LongTensor(X).to(self.device)
+        dataset = TensorDataset(X_tensor)
+        loader = DataLoader(dataset, batch_size=self.batch_size)
+        
+        probabilities = []
+        with torch.no_grad():
+            for batch_X, in loader:
+                outputs = self.model(batch_X)
+                probs = torch.softmax(outputs, dim=1)
+                probabilities.extend(probs.cpu().numpy())
+        
+        return np.array(probabilities)
     
-    def evaluate(
-        self,
-        X_test: np.ndarray,
-        y_test: np.ndarray,
-        verbose: int = 0
-    ) -> Dict:
-        """
-        Evaluate model on test data.
-        
-        Args:
-            X_test: Test sequences
-            y_test: Test labels
-            verbose: Verbosity level
-        
-        Returns:
-            Dictionary with evaluation metrics
-        """
+    def evaluate(self, X_test: np.ndarray, y_test: np.ndarray, verbose: int = 0) -> Dict:
+        """Evaluate model on test data."""
         if self.model is None:
             raise RuntimeError("Model must be built or loaded before evaluation")
         
-        # Get predictions
         y_pred = self.predict(X_test)
         y_pred_proba = self.predict_proba(X_test)
         
-        # Calculate metrics
         from sklearn.metrics import (
             accuracy_score, precision_score, recall_score,
             f1_score, classification_report
@@ -327,49 +281,36 @@ class BiLSTMModel:
         if verbose > 0:
             from config import CLASS_LABELS
             target_names = [CLASS_LABELS[i] for i in sorted(CLASS_LABELS.keys())]
-            report = classification_report(
-                y_test, y_pred,
-                target_names=target_names,
-                digits=4,
-                zero_division=0
-            )
+            report = classification_report(y_test, y_pred, target_names=target_names, digits=4, zero_division=0)
             print("\nClassification Report:")
             print(report)
         
         return metrics
     
     def save(self, filepath: str = None):
-        """
-        Save model to disk.
-        
-        Args:
-            filepath: Path to save model (uses config default if None)
-        """
+        """Save model to disk."""
         if self.model is None:
             raise RuntimeError("No model to save")
         
-        filepath = filepath or MODEL_FILES['bilstm']
-        self.model.save(filepath)
+        filepath = filepath or str(MODEL_FILES['bilstm']).replace('.keras', '.pt')
+        torch.save({
+            'model_state_dict': self.model.state_dict(),
+            'config': self.config,
+            'history': self.history,
+            'training_time': self.training_time
+        }, filepath)
     
     @staticmethod
     def load(filepath: str = None) -> 'BiLSTMModel':
-        """
-        Load model from disk.
+        """Load model from disk."""
+        filepath = filepath or str(MODEL_FILES['bilstm']).replace('.keras', '.pt')
+        checkpoint = torch.load(filepath, map_location='cpu')
         
-        Args:
-            filepath: Path to load from (uses config default if None)
-        
-        Returns:
-            Loaded BiLSTMModel instance
-        """
-        filepath = filepath or MODEL_FILES['bilstm']
-        
-        # Load Keras model
-        keras_model = load_model(filepath)
-        
-        # Create BiLSTMModel wrapper
-        bilstm_model = BiLSTMModel()
-        bilstm_model.model = keras_model
+        bilstm_model = BiLSTMModel(config=checkpoint['config'])
+        bilstm_model.build_model()
+        bilstm_model.model.load_state_dict(checkpoint['model_state_dict'])
+        bilstm_model.history = checkpoint.get('history')
+        bilstm_model.training_time = checkpoint.get('training_time')
         
         return bilstm_model
     
@@ -378,20 +319,17 @@ class BiLSTMModel:
         if self.model is None:
             print("Model not built yet. Call build_model() first.")
         else:
-            self.model.summary()
+            print(self.model)
+            print(f"\nTotal parameters: {sum(p.numel() for p in self.model.parameters()):,}")
+            print(f"Trainable parameters: {sum(p.numel() for p in self.model.parameters() if p.requires_grad):,}")
     
     def get_model_info(self) -> Dict:
-        """
-        Get model information.
-        
-        Returns:
-            Dictionary with model info
-        """
+        """Get model information."""
         if self.model is None:
-            return {
-                'model_type': 'BiLSTM',
-                'built': False
-            }
+            return {'model_type': 'BiLSTM', 'built': False}
+        
+        total_params = sum(p.numel() for p in self.model.parameters())
+        trainable_params = sum(p.numel() for p in self.model.parameters() if p.requires_grad)
         
         info = {
             'model_type': 'BiLSTM',
@@ -399,167 +337,33 @@ class BiLSTMModel:
             'vocab_size': self.vocab_size,
             'embedding_dim': self.embedding_dim,
             'lstm_units': self.lstm_units,
-            'total_lstm_output': self.lstm_units * 2,  # Bidirectional doubles it
+            'total_lstm_output': self.lstm_units * 2,
             'max_length': self.max_length,
             'num_classes': NUM_CLASSES,
-            'total_params': self.model.count_params(),
-            'trainable_params': sum([tf.size(w).numpy() for w in self.model.trainable_weights])
+            'total_params': total_params,
+            'trainable_params': trainable_params,
+            'device': str(self.device)
         }
         
         if self.training_time is not None:
             info['training_time'] = self.training_time
-        
         if self.history is not None:
             info['final_train_accuracy'] = self.history['accuracy'][-1]
-            if 'val_accuracy' in self.history:
+            if 'val_accuracy' in self.history and self.history['val_accuracy']:
                 info['final_val_accuracy'] = self.history['val_accuracy'][-1]
         
         return info
     
-    def plot_training_history(self):
-        """
-        Plot training history (requires matplotlib).
-        """
-        if self.history is None:
-            print("No training history available")
-            return
-        
-        try:
-            import matplotlib.pyplot as plt
-            
-            fig, axes = plt.subplots(1, 2, figsize=(12, 4))
-            
-            # Plot accuracy
-            axes[0].plot(self.history['accuracy'], label='Train')
-            if 'val_accuracy' in self.history:
-                axes[0].plot(self.history['val_accuracy'], label='Validation')
-            axes[0].set_title('Model Accuracy')
-            axes[0].set_xlabel('Epoch')
-            axes[0].set_ylabel('Accuracy')
-            axes[0].legend()
-            axes[0].grid(True)
-            
-            # Plot loss
-            axes[1].plot(self.history['loss'], label='Train')
-            if 'val_loss' in self.history:
-                axes[1].plot(self.history['val_loss'], label='Validation')
-            axes[1].set_title('Model Loss')
-            axes[1].set_xlabel('Epoch')
-            axes[1].set_ylabel('Loss')
-            axes[1].legend()
-            axes[1].grid(True)
-            
-            plt.tight_layout()
-            plt.show()
-            
-        except ImportError:
-            print("Matplotlib not installed. Cannot plot training history.")
-    
     def __repr__(self):
-        """String representation."""
         if self.model is None:
             return "BiLSTMModel(not built)"
         else:
-            params = self.model.count_params()
-            return f"BiLSTMModel(params={params:,}, lstm_units={self.lstm_units}x2)"
+            params = sum(p.numel() for p in self.model.parameters())
+            return f"BiLSTMModel(params={params:,}, lstm_units={self.lstm_units}x2, device={self.device})"
 
-# ==================== CONVENIENCE FUNCTIONS ====================
 
 def create_bilstm_model(config: Dict = None) -> BiLSTMModel:
-    """
-    Create and build BiLSTM model.
-    
-    Args:
-        config: Model configuration
-    
-    Returns:
-        Built BiLSTMModel instance
-    """
+    """Create and build BiLSTM model."""
     model = BiLSTMModel(config=config)
     model.build_model()
     return model
-
-# ==================== TESTING ====================
-
-if __name__ == "__main__":
-    print("=" * 70)
-    print("BiLSTM MODEL TEST")
-    print("=" * 70)
-    
-    # Check TensorFlow
-    print(f"\nTensorFlow version: {tf.__version__}")
-    print(f"GPU available: {len(tf.config.list_physical_devices('GPU')) > 0}")
-    
-    # Create model
-    print("\nBuilding BiLSTM model...")
-    model = BiLSTMModel()
-    model.build_model()
-    
-    # Print summary
-    print("\nModel Architecture:")
-    model.summary()
-    
-    # Get model info
-    info = model.get_model_info()
-    print(f"\nModel Info:")
-    print(f"  Total parameters: {info['total_params']:,}")
-    print(f"  Trainable parameters: {info['trainable_params']:,}")
-    print(f"  LSTM units per direction: {info['lstm_units']}")
-    print(f"  Total LSTM output: {info['total_lstm_output']}")
-    print(f"  Embedding dim: {info['embedding_dim']}")
-    print(f"  Max length: {info['max_length']}")
-    
-    # Test with dummy data
-    print("\nTesting with dummy data...")
-    n_samples = 100
-    X_dummy = np.random.randint(0, 1000, size=(n_samples, model.max_length))
-    y_dummy = np.random.randint(0, NUM_CLASSES, size=(n_samples,))
-    
-    # Test prediction (before training)
-    predictions = model.predict(X_dummy[:10])
-    print(f" Prediction works: {predictions.shape}")
-    
-    probabilities = model.predict_proba(X_dummy[:10])
-    print(f" Predict proba works: {probabilities.shape}")
-    
-    # Test training (1 epoch for speed)
-    print("\nTraining for 1 epoch (test)...")
-    test_config = BILSTM_CONFIG.copy()
-    test_config['epochs'] = 1
-    test_config['batch_size'] = 16
-    
-    test_model = BiLSTMModel(config=test_config)
-    test_model.build_model()
-    
-    history = test_model.train(
-        X_dummy[:80],
-        y_dummy[:80],
-        X_dummy[80:],
-        y_dummy[80:],
-        verbose=0
-    )
-    
-    print(f" Training works")
-    print(f"  Training time: {test_model.training_time:.2f}s")
-    print(f"  Final accuracy: {history['accuracy'][-1]:.4f}")
-    
-    # Test evaluation
-    metrics = test_model.evaluate(X_dummy[:20], y_dummy[:20], verbose=0)
-    print(f" Evaluation works")
-    print(f"  Test accuracy: {metrics['accuracy']:.4f}")
-    
-    # Test save/load
-    print("\nTesting save/load...")
-    test_model.save()
-    print(" Model saved")
-    
-    loaded_model = BiLSTMModel.load()
-    print(" Model loaded")
-    
-    # Verify loaded model works
-    test_pred = loaded_model.predict(X_dummy[:5])
-    print(f" Loaded model works: {test_pred.shape}")
-    
-    print("\n" + "=" * 70)
-    print("BiLSTM MODEL TEST COMPLETE ")
-    print("=" * 70)

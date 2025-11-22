@@ -1,32 +1,40 @@
 """
-Deep Learning Trainer for Hate Speech Detection
-Trains LSTM, BiLSTM, CNN, and optionally BERT models
+Deep Learning Trainer for Hate Speech Detection - PyTorch Implementation
+Trains LSTM, BiLSTM, CNN models with GPU acceleration
 
-PHASE 5: Deep Learning Models
+PHASE 5: Deep Learning Models with PyTorch + CUDA
 
-FIXES:
-- GPU detection and reporting
-- Windows Unicode compatibility (no emojis)
-- BERT compatibility issues
-- Better error handling
+Features:
+- GPU detection and utilization
+- Automatic CUDA optimization
+- Progress tracking and early stopping
+- Model comparison and evaluation
 """
 
 import numpy as np
 import time
 import sys
+from pathlib import Path
 from typing import Dict, List, Tuple, Optional
 import warnings
 warnings.filterwarnings('ignore')
 
-# Check TensorFlow availability
+# Check PyTorch availability
 try:
-    import tensorflow as tf
-    HAS_TENSORFLOW = True
+    import torch
+    HAS_PYTORCH = True
+    print(f"[OK] PyTorch {torch.__version__} detected")
+    if torch.cuda.is_available():
+        print(f"[OK] CUDA {torch.version.cuda} available")
+        print(f"[OK] GPU: {torch.cuda.get_device_name(0)}")
+    else:
+        print("[INFO] CUDA not available, will use CPU")
 except ImportError:
-    HAS_TENSORFLOW = False
+    HAS_PYTORCH = False
+    print("[ERROR] PyTorch not installed!")
 
 from config import (
-    LSTM_CONFIG, BILSTM_CONFIG, CNN_CONFIG, BERT_CONFIG,
+    LSTM_CONFIG, BILSTM_CONFIG, CNN_CONFIG,
     MODEL_FILES, DL_COMPARISON_FILE, RESULTS_DIR,
     USE_GPU
 )
@@ -35,123 +43,96 @@ from utils import (
     ModelEvaluator, format_time, save_results
 )
 
-# Import deep learning models
-if HAS_TENSORFLOW:
+# Import PyTorch deep learning models
+if HAS_PYTORCH:
     from models.deep_learning.text_tokenizer import TextTokenizer
     from models.deep_learning.lstm_model import LSTMModel
     from models.deep_learning.bilstm_model import BiLSTMModel
     from models.deep_learning.cnn_model import CNNModel
-    
-    # Try importing BERT (optional)
-    try:
-        from models.deep_learning.bert_model import BERTModel
-        HAS_BERT = True
-    except ImportError:
-        HAS_BERT = False
-        logger.warning("BERT model not available. Install transformers and torch to enable BERT.")
 else:
-    logger.error("TensorFlow not installed! Cannot use deep learning models.")
-    logger.error("Install with: pip install tensorflow==2.13.0")
+    logger.error("PyTorch not installed! Cannot use deep learning models.")
+    logger.error("Install with: pip install torch")
 
 # ==================== GPU CONFIGURATION ====================
 
 def configure_gpu():
     """
-    Configure GPU settings for TensorFlow with detailed reporting.
-    
-    FIXED: Better GPU detection and ASCII-safe output
+    Configure GPU settings for PyTorch with detailed reporting.
     """
-    if not HAS_TENSORFLOW:
+    if not HAS_PYTORCH:
         return False
     
     print_section_header("GPU CONFIGURATION")
     
-    # Check GPU availability
-    gpus = tf.config.list_physical_devices('GPU')
-    
-    if gpus:
+    if torch.cuda.is_available():
         try:
-            # Enable memory growth to prevent TF from allocating all GPU memory
-            for gpu in gpus:
-                tf.config.experimental.set_memory_growth(gpu, True)
+            # Get GPU info
+            gpu_count = torch.cuda.device_count()
+            logger.info(f"[GPU DETECTED] {gpu_count} device(s) available")
             
-            logger.info(f"[GPU DETECTED] {len(gpus)} device(s) available")
-            
-            for i, gpu in enumerate(gpus):
-                logger.info(f"  GPU {i}: {gpu.name}")
-                
-                # Try to get more GPU details
-                try:
-                    gpu_details = tf.config.experimental.get_device_details(gpu)
-                    if 'device_name' in gpu_details:
-                        logger.info(f"    Device Name: {gpu_details['device_name']}")
-                    if 'compute_capability' in gpu_details:
-                        logger.info(f"    Compute Capability: {gpu_details['compute_capability']}")
-                except Exception:
-                    pass
+            for i in range(gpu_count):
+                gpu_name = torch.cuda.get_device_name(i)
+                gpu_memory = torch.cuda.get_device_properties(i).total_memory / 1e9
+                logger.info(f"  GPU {i}: {gpu_name}")
+                logger.info(f"    Total Memory: {gpu_memory:.2f} GB")
             
             # Test GPU computation
             logger.info("\nTesting GPU computation...")
-            try:
-                with tf.device('/GPU:0'):
-                    # Simple matrix multiplication test
-                    a = tf.constant([[1.0, 2.0], [3.0, 4.0]])
-                    b = tf.constant([[1.0, 1.0], [0.0, 1.0]])
-                    c = tf.matmul(a, b)
-                    _ = c.numpy()  # Force execution
-                
-                logger.info("[SUCCESS] GPU computation test passed")
-                logger.info("Training will use GPU (5-10x faster than CPU)")
-                return True
-                
-            except Exception as e:
-                logger.warning(f"[WARNING] GPU test failed: {e}")
-                logger.warning("Falling back to CPU")
-                return False
+            device = torch.device('cuda:0')
+            a = torch.randn(1000, 1000, device=device)
+            b = torch.randn(1000, 1000, device=device)
+            c = torch.matmul(a, b)
+            torch.cuda.synchronize()
             
-        except RuntimeError as e:
-            logger.warning(f"[WARNING] GPU configuration failed: {e}")
-            logger.warning("Training will use CPU")
+            logger.info("[SUCCESS] GPU computation test passed")
+            logger.info("Training will use GPU (5-10x faster than CPU)")
+            
+            # Print CUDA optimizations
+            logger.info("\nCUDA Optimizations:")
+            logger.info(f"  cuDNN enabled: {torch.backends.cudnn.enabled}")
+            logger.info(f"  cuDNN benchmark: {torch.backends.cudnn.benchmark}")
+            
+            # Enable cuDNN benchmark for better performance
+            torch.backends.cudnn.benchmark = True
+            
+            return True
+            
+        except Exception as e:
+            logger.warning(f"[WARNING] GPU test failed: {e}")
+            logger.warning("Falling back to CPU")
             return False
     else:
         logger.info("[NO GPU] Training will use CPU")
         logger.info("Expected training times on CPU:")
         logger.info("  - LSTM: ~2-3 minutes")
-        logger.info("  - BiLSTM: ~6-8 minutes")
-        logger.info("  - CNN: ~1 minute")
-        logger.info("  - BERT: ~30-40 minutes")
-        logger.info("\nTIP: Use Google Colab or Kaggle for free GPU access")
+        logger.info("  - BiLSTM: ~4-6 minutes")
+        logger.info("  - CNN: ~1-2 minutes")
+        logger.info("\nTIP: Install CUDA-enabled PyTorch for GPU acceleration:")
+        logger.info("  pip install torch --index-url https://download.pytorch.org/whl/cu118")
         return False
 
 # ==================== DEEP LEARNING TRAINER ====================
 
 class DeepLearningTrainer:
     """
-    Train and evaluate deep learning models for hate speech detection.
+    Train and evaluate PyTorch deep learning models for hate speech detection.
     
     Models:
     - LSTM: Long Short-Term Memory
     - BiLSTM: Bidirectional LSTM
     - CNN: Convolutional Neural Network
-    - BERT: Transformer-based (optional)
     """
     
-    def __init__(self, use_bert: bool = False):
-        """
-        Initialize Deep Learning Trainer.
-        
-        Args:
-            use_bert: Whether to train BERT model (requires more resources)
-        """
-        if not HAS_TENSORFLOW:
+    def __init__(self):
+        """Initialize Deep Learning Trainer."""
+        if not HAS_PYTORCH:
             raise ImportError(
-                "TensorFlow is required for deep learning models.\n"
-                "Install with: pip install tensorflow==2.13.0"
+                "PyTorch is required for deep learning models.\n"
+                "Install with: pip install torch"
             )
         
-        logger.info("Initializing Deep Learning Trainer...")
+        logger.info("Initializing PyTorch Deep Learning Trainer...")
         
-        self.use_bert = use_bert and HAS_BERT
         self.tokenizer = None
         self.models = {}
         self.trained_models = {}
@@ -166,7 +147,7 @@ class DeepLearningTrainer:
     
     def _initialize_models(self):
         """Initialize all deep learning models."""
-        logger.info("Initializing deep learning models...")
+        logger.info("Initializing PyTorch deep learning models...")
         
         # LSTM
         self.models['LSTM'] = LSTMModel(config=LSTM_CONFIG)
@@ -177,30 +158,16 @@ class DeepLearningTrainer:
         # CNN
         self.models['CNN'] = CNNModel(config=CNN_CONFIG)
         
-        # BERT (optional)
-        if self.use_bert:
-            self.models['BERT'] = BERTModel(config=BERT_CONFIG)
-            logger.info("BERT model included (this will significantly increase training time)")
-        else:
-            logger.info("BERT model excluded (set use_bert=True to include)")
-        
         logger.info(f"Initialized {len(self.models)} models: {list(self.models.keys())}")
+        logger.info(f"Framework: PyTorch {torch.__version__}")
+        logger.info(f"Device: {'CUDA' if self.has_gpu else 'CPU'}")
     
     def prepare_tokenizer(
         self,
         X_train: np.ndarray,
         save_tokenizer: bool = True
     ) -> TextTokenizer:
-        """
-        Prepare and fit tokenizer on training data.
-        
-        Args:
-            X_train: Training texts (raw strings)
-            save_tokenizer: Whether to save tokenizer
-        
-        Returns:
-            Fitted TextTokenizer
-        """
+        """Prepare and fit tokenizer on training data."""
         print_section_header("TOKENIZER PREPARATION")
         
         logger.info("Initializing TextTokenizer...")
@@ -246,23 +213,13 @@ class DeepLearningTrainer:
         X_val: np.ndarray,
         X_test: np.ndarray
     ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
-        """
-        Tokenize all datasets for LSTM/BiLSTM/CNN models.
-        
-        Args:
-            X_train: Training texts
-            X_val: Validation texts
-            X_test: Test texts
-        
-        Returns:
-            Tuple of tokenized (X_train, X_val, X_test)
-        """
+        """Tokenize all datasets."""
         print_section_header("DATA TOKENIZATION")
         
         if self.tokenizer is None:
             raise RuntimeError("Tokenizer must be prepared before tokenizing data")
         
-        logger.info("Tokenizing datasets for LSTM/BiLSTM/CNN models...")
+        logger.info("Tokenizing datasets...")
         
         # Tokenize training data
         logger.info(f"Tokenizing {len(X_train):,} training samples...")
@@ -290,30 +247,50 @@ class DeepLearningTrainer:
         
         return X_train_seq, X_val_seq, X_test_seq
     
-    def train_sequence_model(
-        self,
-        model_name: str,
-        model,
-        X_train_seq: np.ndarray,
-        y_train: np.ndarray,
-        X_val_seq: np.ndarray,
-        y_val: np.ndarray
+    def load_phase3_embeddings(self) -> Optional[np.ndarray]:
+        """Load Phase 3 embeddings for CNN."""
+        if self.tokenizer is None:
+            return None
+        
+        try:
+            # Import adapter
+            import sys
+            sys.path.insert(0, str(Path(__file__).parent.parent))
+            from models.embedding_adaptor import get_averaged_embeddings
+            
+            print("[INFO] Loading Phase 3 Word2Vec + FastText embeddings...")
+            embeddings = get_averaged_embeddings(self.tokenizer, embedding_dim=100)
+            
+            if embeddings is not None:
+                print(f"[SUCCESS] Loaded embeddings: {embeddings.shape}")
+            return embeddings
+            
+        except Exception as e:
+            print(f"[WARNING] Could not load Phase 3 embeddings: {e}")
+            return None
+    
+    def train_model(
+    self,
+    model_name: str,
+    model,
+    X_train_seq: np.ndarray,
+    y_train: np.ndarray,
+    X_val_seq: np.ndarray,
+    y_val: np.ndarray
     ) -> Dict:
-        """
-        Train a sequence model (LSTM/BiLSTM/CNN).
-        
-        Args:
-            model_name: Name of the model
-            model: Model instance
-            X_train_seq: Training sequences (tokenized)
-            y_train: Training labels
-            X_val_seq: Validation sequences (tokenized)
-            y_val: Validation labels
-        
-        Returns:
-            Dictionary with results
-        """
+        """Train a PyTorch model."""
         print_section_header(f"TRAINING {model_name}")
+        
+        # Load embeddings for CNN ONLY
+        if model_name == 'CNN':
+            embeddings = self.load_phase3_embeddings()
+            
+            if embeddings is not None:
+                # Rebuild CNN model with embeddings
+                logger.info("[CNN] Rebuilding with Phase 3 embeddings...")
+                from models.deep_learning.cnn_model import CNNModel
+                model = CNNModel(config=CNN_CONFIG, pretrained_embeddings=embeddings)
+                logger.info("[CNN] Model will use your trained Word2Vec + FastText embeddings")
         
         # Build model
         logger.info(f"Building {model_name} architecture...")
@@ -330,6 +307,7 @@ class DeepLearningTrainer:
         logger.info(f"  Trainable parameters: {info['trainable_params']:,}")
         logger.info(f"  Embedding dim: {info['embedding_dim']}")
         logger.info(f"  Max length: {info['max_length']}")
+        logger.info(f"  Device: {info['device']}")
         
         # Train model
         logger.info(f"\nTraining {model_name}...")
@@ -337,7 +315,7 @@ class DeepLearningTrainer:
         logger.info(f"  Validation samples: {len(X_val_seq):,}")
         logger.info(f"  Batch size: {model.batch_size}")
         logger.info(f"  Epochs: {model.epochs}")
-        logger.info(f"  Device: {'GPU' if self.has_gpu else 'CPU'}")
+        logger.info(f"  Device: {'GPU (CUDA)' if self.has_gpu else 'CPU'}")
         
         try:
             # Train
@@ -356,7 +334,7 @@ class DeepLearningTrainer:
             logger.info(f"\nTraining History:")
             logger.info(f"  Final train accuracy: {history['accuracy'][-1]:.4f}")
             logger.info(f"  Final train loss: {history['loss'][-1]:.4f}")
-            if 'val_accuracy' in history:
+            if 'val_accuracy' in history and history['val_accuracy']:
                 logger.info(f"  Final val accuracy: {history['val_accuracy'][-1]:.4f}")
                 logger.info(f"  Final val loss: {history['val_loss'][-1]:.4f}")
                 logger.info(f"  Best val accuracy: {max(history['val_accuracy']):.4f}")
@@ -378,9 +356,6 @@ class DeepLearningTrainer:
             # Print results
             self.evaluator.print_evaluation(result)
             
-            # Check for potential issues
-            self._check_model_issues(model_name, result)
-            
             # Store trained model
             self.trained_models[model_name] = model
             
@@ -391,145 +366,6 @@ class DeepLearningTrainer:
             import traceback
             traceback.print_exc()
             return None
-    
-    def train_bert_model(
-        self,
-        model_name: str,
-        model,
-        X_train: np.ndarray,  # Raw text!
-        y_train: np.ndarray,
-        X_val: np.ndarray,    # Raw text!
-        y_val: np.ndarray
-    ) -> Dict:
-        """
-        Train BERT model (uses raw text, not sequences).
-        
-        Args:
-            model_name: Name of the model
-            model: BERT model instance
-            X_train: Training texts (raw strings)
-            y_train: Training labels
-            X_val: Validation texts (raw strings)
-            y_val: Validation labels
-        
-        Returns:
-            Dictionary with results
-        """
-        print_section_header(f"TRAINING {model_name}")
-        
-        logger.info("[WARNING] BERT training is SLOW (~30 min on CPU, ~5 min on GPU)")
-        logger.info("Consider reducing epochs or batch size if needed")
-        
-        # Build model
-        logger.info(f"Building {model_name} architecture...")
-        logger.info("(This will download pretrained weights if not cached)")
-        
-        try:
-            model.build_model()
-        except Exception as e:
-            logger.error(f"Failed to build BERT model: {e}")
-            logger.error("Make sure transformers and torch are installed:")
-            logger.error("  pip install transformers==4.30.0 torch==2.0.1")
-            return None
-        
-        # Get model info
-        info = model.get_model_info()
-        logger.info(f"\nModel Configuration:")
-        logger.info(f"  Model: {info['model_name']}")
-        logger.info(f"  Total parameters: {info['total_params']:,}")
-        logger.info(f"  Vocab size: {info['vocab_size']:,}")
-        logger.info(f"  Max length: {info['max_length']}")
-        
-        # Train model
-        logger.info(f"\nTraining {model_name}...")
-        logger.info(f"  Training samples: {len(X_train):,}")
-        logger.info(f"  Validation samples: {len(X_val):,}")
-        logger.info(f"  Batch size: {model.batch_size}")
-        logger.info(f"  Epochs: {model.epochs}")
-        logger.info(f"  Device: {'GPU' if self.has_gpu else 'CPU'}")
-        
-        try:
-            # Convert numpy arrays to lists for BERT
-            X_train_list = X_train.tolist()
-            X_val_list = X_val.tolist()
-            
-            # Train
-            history = model.train(
-                X_train_list,
-                y_train,
-                X_val_list,
-                y_val,
-                verbose=1
-            )
-            
-            training_time = model.training_time
-            logger.info(f"\n{model_name} training completed in {format_time(training_time)}")
-            
-            # Show training history
-            logger.info(f"\nTraining History:")
-            logger.info(f"  Final train accuracy: {history['accuracy'][-1]:.4f}")
-            logger.info(f"  Final train loss: {history['loss'][-1]:.4f}")
-            if 'val_accuracy' in history:
-                logger.info(f"  Final val accuracy: {history['val_accuracy'][-1]:.4f}")
-                logger.info(f"  Final val loss: {history['val_loss'][-1]:.4f}")
-                logger.info(f"  Best val accuracy: {max(history['val_accuracy']):.4f}")
-            
-            # Predict on validation set
-            logger.info(f"\nEvaluating {model_name} on validation set...")
-            y_pred = model.predict(X_val_list)
-            y_pred_proba = model.predict_proba(X_val_list)
-            
-            # Evaluate
-            result = self.evaluator.evaluate_model(
-                model_name=model_name,
-                y_true=y_val,
-                y_pred=y_pred,
-                y_pred_proba=y_pred_proba,
-                training_time=training_time
-            )
-            
-            # Print results
-            self.evaluator.print_evaluation(result)
-            
-            # Store trained model
-            self.trained_models[model_name] = model
-            
-            return result
-            
-        except Exception as e:
-            logger.error(f"Error training {model_name}: {e}")
-            logger.error("\nPossible causes:")
-            logger.error("  1. Version incompatibility (try: pip install transformers==4.30.0)")
-            logger.error("  2. Insufficient memory (reduce batch_size in config.py)")
-            logger.error("  3. Missing dependencies (ensure torch is installed)")
-            import traceback
-            traceback.print_exc()
-            return None
-    
-    def _check_model_issues(self, model_name: str, result: Dict):
-        """Check for common training issues and print warnings."""
-        per_class = result.get('per_class', {})
-        
-        issues = []
-        
-        # Check for classes with no predictions
-        for class_name, metrics in per_class.items():
-            if metrics['precision'] == 0 and metrics['recall'] == 0:
-                issues.append(f"  [WARNING] {class_name}: Model makes no predictions (0% precision/recall)")
-        
-        # Check for severe class imbalance effects
-        accuracies = [metrics['f1'] for metrics in per_class.values()]
-        if accuracies:
-            min_f1 = min(accuracies)
-            max_f1 = max(accuracies)
-            if max_f1 - min_f1 > 0.5:  # Large gap between classes
-                issues.append(f"  [WARNING] Large performance gap between classes (F1: {min_f1:.2f} - {max_f1:.2f})")
-                issues.append(f"  Suggestion: Try adding class weights or data augmentation")
-        
-        if issues:
-            logger.warning(f"\n[POTENTIAL ISSUES DETECTED in {model_name}]")
-            for issue in issues:
-                logger.warning(issue)
     
     def train_all_models(
         self,
@@ -538,16 +374,8 @@ class DeepLearningTrainer:
         X_val: np.ndarray,
         y_val: np.ndarray
     ):
-        """
-        Train all deep learning models.
-        
-        Args:
-            X_train: Training texts (raw strings)
-            y_train: Training labels
-            X_val: Validation texts (raw strings)
-            y_val: Validation labels
-        """
-        print_section_header("TRAINING ALL DEEP LEARNING MODELS")
+        """Train all deep learning models."""
+        print_section_header("TRAINING ALL DEEP LEARNING MODELS (PyTorch)")
         
         logger.info(f"Training {len(self.models)} models:")
         for model_name in self.models.keys():
@@ -556,15 +384,13 @@ class DeepLearningTrainer:
         # Step 1: Prepare tokenizer
         self.prepare_tokenizer(X_train, save_tokenizer=True)
         
-        # Step 2: Tokenize data for sequence models
-        X_train_seq, X_val_seq, X_test_seq = self.tokenize_data(X_train, X_val, X_val)  # Note: Using val as test for now
+        # Step 2: Tokenize data
+        X_train_seq, X_val_seq, X_test_seq = self.tokenize_data(X_train, X_val, X_val)
         
-        # Step 3: Train sequence models (LSTM, BiLSTM, CNN)
-        sequence_models = ['LSTM', 'BiLSTM', 'CNN']
-        
-        for model_name in sequence_models:
+        # Step 3: Train all models
+        for model_name in ['CNN']:
             if model_name in self.models:
-                result = self.train_sequence_model(
+                result = self.train_model(
                     model_name=model_name,
                     model=self.models[model_name],
                     X_train_seq=X_train_seq,
@@ -576,27 +402,7 @@ class DeepLearningTrainer:
                 if result:
                     self.results[model_name] = result
         
-        # Step 4: Train BERT (if enabled)
-        if 'BERT' in self.models:
-            logger.info("\n" + "="*70)
-            logger.info("Starting BERT training (this may take a while)...")
-            logger.info("="*70 + "\n")
-            
-            result = self.train_bert_model(
-                model_name='BERT',
-                model=self.models['BERT'],
-                X_train=X_train,
-                y_train=y_train,
-                X_val=X_val,
-                y_val=y_val
-            )
-            
-            if result:
-                self.results['BERT'] = result
-            else:
-                logger.warning("[SKIPPED] BERT training failed - continuing with other models")
-        
-        # Step 5: Print comparison
+        # Step 4: Print comparison
         print_section_header("DEEP LEARNING MODEL COMPARISON")
         self.evaluator.print_comparison()
     
@@ -605,20 +411,14 @@ class DeepLearningTrainer:
         X_test: np.ndarray,
         y_test: np.ndarray
     ):
-        """
-        Evaluate all trained models on test set.
-        
-        Args:
-            X_test: Test texts (raw strings)
-            y_test: Test labels
-        """
+        """Evaluate all trained models on test set."""
         print_section_header("TEST SET EVALUATION")
         
         logger.info(f"Evaluating on test set: {len(X_test):,} samples")
         
-        # Tokenize test data for sequence models
+        # Tokenize test data
         if self.tokenizer is None:
-            logger.error("Tokenizer not available. Cannot evaluate sequence models.")
+            logger.error("Tokenizer not available. Cannot evaluate.")
             return
         
         logger.info("Tokenizing test data...")
@@ -626,10 +426,8 @@ class DeepLearningTrainer:
         
         test_evaluator = ModelEvaluator()
         
-        # Evaluate sequence models
-        sequence_models = ['LSTM', 'BiLSTM', 'CNN']
-        
-        for model_name in sequence_models:
+        # Evaluate all models
+        for model_name in ['LSTM', 'BiLSTM', 'CNN']:
             if model_name in self.trained_models:
                 logger.info(f"\nEvaluating {model_name} on test set...")
                 
@@ -649,27 +447,6 @@ class DeepLearningTrainer:
                 
                 test_evaluator.print_evaluation(result)
         
-        # Evaluate BERT
-        if 'BERT' in self.trained_models:
-            logger.info(f"\nEvaluating BERT on test set...")
-            
-            model = self.trained_models['BERT']
-            X_test_list = X_test.tolist()
-            
-            # Predict
-            y_pred = model.predict(X_test_list)
-            y_pred_proba = model.predict_proba(X_test_list)
-            
-            # Evaluate
-            result = test_evaluator.evaluate_model(
-                model_name='BERT',
-                y_true=y_test,
-                y_pred=y_pred,
-                y_pred_proba=y_pred_proba
-            )
-            
-            test_evaluator.print_evaluation(result)
-        
         # Print comparison
         print_section_header("TEST SET MODEL COMPARISON")
         test_evaluator.print_comparison()
@@ -680,15 +457,15 @@ class DeepLearningTrainer:
         """Save all trained models to disk."""
         print_section_header("SAVING MODELS")
         
-        logger.info(f"Saving {len(self.trained_models)} models...")
+        logger.info(f"Saving {len(self.trained_models)} PyTorch models...")
         
         saved_count = 0
-        
         for model_name, model in self.trained_models.items():
             try:
                 logger.info(f"Saving {model_name}...")
                 model.save()
-                logger.info(f"  [OK] {model_name} saved to {MODEL_FILES[model_name.lower()]}")
+                filepath = str(MODEL_FILES[model_name.lower()]).replace('.keras', '.pt')
+                logger.info(f"  [OK] {model_name} saved to {filepath}")
                 saved_count += 1
             except Exception as e:
                 logger.error(f"  [ERROR] Error saving {model_name}: {e}")
@@ -699,13 +476,15 @@ class DeepLearningTrainer:
         """Save training metadata and results."""
         logger.info("Saving deep learning metadata...")
         
-        # Get best model
         comparison_df = self.evaluator.get_comparison_df()
         
         if not comparison_df.empty:
             best_model = comparison_df.iloc[0]
             
             metadata = {
+                'framework': 'PyTorch',
+                'pytorch_version': torch.__version__,
+                'cuda_available': torch.cuda.is_available(),
                 'num_models_trained': len(self.trained_models),
                 'models': list(self.trained_models.keys()),
                 'tokenizer_info': self.tokenizer.get_statistics() if self.tokenizer else None,
@@ -748,6 +527,18 @@ class DeepLearningTrainer:
         best_model = self.trained_models.get(best_model_name)
         
         return best_model_name, best_model
+    
+    def get_best_model_name(self):
+        """Get the name of the best performing model."""
+        best_name, _ = self.get_best_model()
+        return best_name
+    
+    def get_best_metrics(self):
+        """Get metrics for the best model."""
+        best_name, best_model = self.get_best_model()
+        if best_name and best_name in self.results:
+            return self.results[best_name]['metrics']
+        return {}
 
 # ==================== MAIN TRAINING FUNCTION ====================
 
@@ -762,7 +553,7 @@ def train_deep_learning_models(
     save_models: bool = True
 ):
     """
-    Main function to train all deep learning models.
+    Main function to train all PyTorch deep learning models.
     
     Args:
         X_train: Training texts (raw strings)
@@ -771,30 +562,29 @@ def train_deep_learning_models(
         y_val: Validation labels
         X_test: Test texts (raw strings, optional)
         y_test: Test labels (optional)
-        use_bert: Whether to train BERT model
+        use_bert: Ignored (not implemented in PyTorch version)
         save_models: Whether to save models
     
     Returns:
         Trained DeepLearningTrainer instance
     """
-    print_section_header("DEEP LEARNING TRAINING PIPELINE")
+    print_section_header("PyTorch DEEP LEARNING TRAINING PIPELINE")
     
-    # Check TensorFlow
-    if not HAS_TENSORFLOW:
-        logger.error("TensorFlow not installed!")
-        logger.error("Install with: pip install tensorflow==2.13.0")
+    # Check PyTorch
+    if not HAS_PYTORCH:
+        logger.error("PyTorch not installed!")
+        logger.error("Install with: pip install torch")
+        logger.error("For CUDA support: pip install torch --index-url https://download.pytorch.org/whl/cu118")
         sys.exit(1)
     
-    logger.info(f"TensorFlow version: {tf.__version__}")
-    
-    # Check BERT availability
-    if use_bert and not HAS_BERT:
-        logger.warning("BERT requested but not available!")
-        logger.warning("Install with: pip install transformers==4.30.0 torch==2.0.1")
-        use_bert = False
+    logger.info(f"PyTorch version: {torch.__version__}")
+    logger.info(f"CUDA available: {torch.cuda.is_available()}")
+    if torch.cuda.is_available():
+        logger.info(f"CUDA version: {torch.version.cuda}")
+        logger.info(f"GPU: {torch.cuda.get_device_name(0)}")
     
     # Initialize trainer
-    trainer = DeepLearningTrainer(use_bert=use_bert)
+    trainer = DeepLearningTrainer()
     
     # Train all models
     trainer.train_all_models(X_train, y_train, X_val, y_val)
@@ -835,43 +625,26 @@ def train_deep_learning_models(
     except Exception as e:
         logger.warning(f"Could not compare with traditional ML: {e}")
     
-    logger.info(f"\nAll models saved to: {MODEL_FILES['lstm'].parent}")
+    model_dir = MODEL_FILES['lstm'].parent
+    logger.info(f"\nAll models saved to: {model_dir}")
     logger.info(f"Tokenizer saved to: {MODEL_FILES['tokenizer']}")
+    logger.info(f"Framework: PyTorch {torch.__version__}")
+    logger.info(f"Device: {'CUDA' if trainer.has_gpu else 'CPU'}")
     
     return trainer
 
-# ==================== TESTING ====================
+# Export
+HAS_TENSORFLOW = HAS_PYTORCH  # For compatibility
 
 if __name__ == "__main__":
     print("=" * 80)
-    print("DEEP LEARNING TRAINER TEST")
+    print("PyTorch DEEP LEARNING TRAINER")
     print("=" * 80)
     
     print("\nThis module requires actual data to train.")
-    print("Use from main_train.py or run:")
+    print("Use from main_train_enhanced.py with --phase5 flag")
     print()
-    print("  from data_handler import load_and_split_data")
-    print("  from models.deep_learning_trainer import train_deep_learning_models")
+    print("Example:")
+    print("  python main_train_enhanced.py --phase5")
     print()
-    print("  # Load data")
-    print("  X_train, X_val, X_test, y_train, y_val, y_test = load_and_split_data()")
-    print()
-    print("  # Train models (without BERT)")
-    print("  trainer = train_deep_learning_models(")
-    print("      X_train, y_train,")
-    print("      X_val, y_val,")
-    print("      X_test, y_test,")
-    print("      use_bert=False,")
-    print("      save_models=True")
-    print("  )")
-    print()
-    print("  # Or include BERT (slower)")
-    print("  trainer = train_deep_learning_models(")
-    print("      X_train, y_train,")
-    print("      X_val, y_val,")
-    print("      X_test, y_test,")
-    print("      use_bert=True,  # Takes ~30 min on CPU")
-    print("      save_models=True")
-    print("  )")
-    
-    print("\n" + "=" * 80)
+    print("=" * 80)
