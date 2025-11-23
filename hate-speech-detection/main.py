@@ -135,7 +135,7 @@ def get_classifier():
     if classifier is None:
         logger.info("Loading classifier...")
         try:
-            classifier = ExplainableTweetClassifier()
+            classifier = ExplainableTweetClassifier(model_name='bert-base')
             logger.info("Classifier loaded successfully")
         except Exception as e:
             logger.error(f"Failed to load classifier: {e}")
