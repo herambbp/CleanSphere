@@ -1,10 +1,10 @@
 """
-Unified Tweet Classifier - Supports Both Traditional ML and Deep Learning
+Unified Tweet Classifier - Supports Traditional ML, PyTorch DL, and BERT Models
 Automatically selects the best model from ALL trained models
 
 PHASE 1-3: Base classification (Hate/Offensive/Neither)
 PHASE 4: Severity analysis + Action recommendations
-PHASE 5: Deep learning models (LSTM, BiLSTM, CNN, BERT)
+PHASE 5: Deep learning models (LSTM, BiLSTM, CNN, BERT) - PyTorch Implementation
 """
 
 import numpy as np
@@ -14,17 +14,25 @@ from typing import List, Dict, Union, Optional
 import warnings
 warnings.filterwarnings('ignore')
 
-from config import MODEL_FILES, CLASS_LABELS, RESULTS_DIR
+from config import MODEL_FILES, CLASS_LABELS, RESULTS_DIR, MODELS_DIR
 from utils import logger, print_section_header, load_results
+
+# Check for PyTorch
+try:
+    import torch
+    HAS_TORCH = True
+except ImportError:
+    HAS_TORCH = False
+    logger.warning("PyTorch not available. Deep learning models will not work.")
 
 # ==================== UNIFIED TWEET CLASSIFIER ====================
 
 class TweetClassifier:
     """
-    Unified classifier supporting both Traditional ML and Deep Learning models.
+    Unified classifier supporting Traditional ML, PyTorch DL, and BERT models.
     
     Features:
-    - Automatically selects best model (Traditional ML or Deep Learning)
+    - Automatically selects best model (Traditional ML, PyTorch DL, or BERT)
     - Base classification (Hate/Offensive/Neither)
     - Confidence scores
     - Severity analysis (LOW to EXTREME) [Phase 4]
@@ -38,7 +46,7 @@ class TweetClassifier:
         
         Args:
             model_name: Name of model ('best', 'cnn', 'bert', 'xgboost', etc.)
-            model_type: Type of model ('auto', 'traditional', 'deep_learning')
+            model_type: Type of model ('auto', 'traditional', 'deep_learning', 'bert')
         """
         logger.info("Initializing Unified Tweet Classifier...")
         
@@ -56,14 +64,14 @@ class TweetClassifier:
         # Load metadata first
         self._load_metadata()
         
-        # FIXED: Resolve 'best' to actual model name BEFORE determining type
+        # Resolve 'best' to actual model name BEFORE determining type
         if model_name.lower() == 'best':
             actual_model = self._get_best_model_name()
             self.model_name = actual_model
-            model_name = actual_model  # Update local variable
+            model_name = actual_model
             logger.info(f"'best' resolved to: {actual_model}")
         
-        # Now determine type and load
+        # Determine type and load components
         self._determine_model_type(model_name)
         self._load_model_components()
         self._load_model(model_name)
@@ -74,7 +82,7 @@ class TweetClassifier:
             logger.info(f"Model F1-Macro: {self.metadata[self.model_name]['f1_macro']:.4f}")
     
     def _load_metadata(self):
-        """Load metadata from both Traditional ML and Deep Learning."""
+        """Load metadata from both Traditional ML, Deep Learning, and BERT."""
         # Load Traditional ML metadata
         try:
             trad_metadata = load_results('model_metadata.json')
@@ -90,16 +98,19 @@ class TweetClassifier:
         except Exception as e:
             logger.warning(f"Could not load Traditional ML metadata: {e}")
         
-        # Load Deep Learning metadata
+        # Load Deep Learning metadata (PyTorch + BERT)
         try:
             dl_metadata = load_results('dl_model_metadata.json')
             if dl_metadata and 'all_results' in dl_metadata:
                 for model_name, metrics in dl_metadata['all_results'].items():
+                    # Determine if it's BERT or regular DL
+                    model_type = 'BERT' if 'bert' in model_name.lower() else 'Deep Learning'
+                    
                     self.metadata[model_name] = {
                         'accuracy': metrics.get('accuracy', 0),
                         'f1_macro': metrics.get('f1_macro', 0),
                         'f1_weighted': metrics.get('f1_weighted', 0),
-                        'type': 'Deep Learning'
+                        'type': model_type
                     }
             logger.info("Deep Learning metadata loaded")
         except Exception as e:
@@ -111,31 +122,38 @@ class TweetClassifier:
             logger.warning("No metadata found, defaulting to CNN")
             return 'CNN'
         
-        # Find model with highest F1-Macro (better metric for imbalanced data)
+        # Find model with highest F1-Macro
         best_model = max(self.metadata.items(), key=lambda x: x[1].get('f1_macro', 0))
         
         logger.info(f"Best model selected: {best_model[0]} (F1-Macro: {best_model[1]['f1_macro']:.4f})")
         return best_model[0]
     
     def _determine_model_type(self, model_name: str):
-        """Determine if model is Traditional ML or Deep Learning."""
+        """Determine if model is Traditional ML, PyTorch DL, or BERT."""
         if self.model_type != 'auto':
             return
         
-        # Check model type (model_name should already be resolved)
-        dl_models = ['lstm', 'bilstm', 'cnn', 'bert']
-        trad_models = ['randomforest', 'xgboost', 'svm', 'gradientboosting', 'mlp']
+        model_lower = model_name.lower().replace(' ', '').replace('_', '').replace('-', '')
         
-        model_lower = model_name.lower().replace(' ', '').replace('_', '')
-        
-        if any(dl in model_lower for dl in dl_models):
+        # Check if it's BERT
+        if 'bert' in model_lower:
+            self.model_type = 'bert'
+        # Check if it's PyTorch DL
+        elif any(dl in model_lower for dl in ['lstm', 'bilstm', 'cnn']):
             self.model_type = 'deep_learning'
-        elif any(trad in model_lower for trad in trad_models):
+        # Check if it's Traditional ML
+        elif any(trad in model_lower for trad in ['randomforest', 'xgboost', 'svm', 'gradientboosting', 'mlp']):
             self.model_type = 'traditional'
         else:
             # Default based on metadata
             if model_name in self.metadata:
-                self.model_type = 'traditional' if self.metadata[model_name]['type'] == 'Traditional ML' else 'deep_learning'
+                meta_type = self.metadata[model_name]['type']
+                if meta_type == 'BERT':
+                    self.model_type = 'bert'
+                elif meta_type == 'Deep Learning':
+                    self.model_type = 'deep_learning'
+                else:
+                    self.model_type = 'traditional'
             else:
                 logger.warning(f"Unknown model type for {model_name}, defaulting to traditional")
                 self.model_type = 'traditional'
@@ -144,7 +162,7 @@ class TweetClassifier:
         """Load required components based on model type."""
         if self.model_type == 'traditional':
             self._load_feature_extractor()
-        else:  # deep_learning
+        elif self.model_type in ['deep_learning', 'bert']:
             self._load_tokenizer()
     
     def _load_feature_extractor(self):
@@ -161,148 +179,361 @@ class TweetClassifier:
             )
     
     def _load_tokenizer(self):
-        """Load the tokenizer (for Deep Learning)."""
+        """Load the tokenizer (for Deep Learning and BERT)."""
         try:
             # Import TextTokenizer class
             from models.deep_learning.text_tokenizer import TextTokenizer
             
             tokenizer_path = MODEL_FILES.get('tokenizer')
-            if not tokenizer_path or not tokenizer_path.exists():
-                logger.warning(f"Tokenizer file not found at: {tokenizer_path}")
+            logger.info(f"Looking for tokenizer at: {tokenizer_path}")
+            
+            if not tokenizer_path:
+                error_msg = "Tokenizer path not found in MODEL_FILES config"
+                logger.error(error_msg)
+                if self.model_type == 'deep_learning':
+                    raise RuntimeError(error_msg)
+                self.tokenizer = None
+                return
+                
+            if not tokenizer_path.exists():
+                error_msg = f"Tokenizer file not found at: {tokenizer_path}"
+                logger.error(error_msg)
+                if self.model_type == 'deep_learning':
+                    raise FileNotFoundError(error_msg)
                 self.tokenizer = None
                 return
             
             # Load tokenizer
+            logger.info(f"Loading tokenizer from {tokenizer_path}")
             loaded_data = joblib.load(tokenizer_path)
+            logger.info(f"Tokenizer loaded, type: {type(loaded_data)}")
             
             # Handle different tokenizer formats
             if isinstance(loaded_data, TextTokenizer):
                 # Already a TextTokenizer object
                 self.tokenizer = loaded_data
                 logger.info("Tokenizer loaded successfully (TextTokenizer object)")
-            
-            elif isinstance(loaded_data, dict):
-                # Dictionary format - need to reconstruct
-                logger.info("Tokenizer loaded as dict, reconstructing TextTokenizer...")
                 
-                # Check if it has the keras tokenizer
+            elif isinstance(loaded_data, dict):
+                logger.info(f"Tokenizer is dict with keys: {loaded_data.keys()}")
+                
+                # Format 1: Has 'tokenizer' key (older format)
                 if 'tokenizer' in loaded_data:
-                    # Create new TextTokenizer and restore state
                     self.tokenizer = TextTokenizer(
                         vocab_size=loaded_data.get('vocab_size', 20000),
                         max_length=loaded_data.get('max_length', 100)
                     )
                     self.tokenizer.tokenizer = loaded_data['tokenizer']
                     self.tokenizer.is_fitted = loaded_data.get('is_fitted', True)
-                    logger.info("TextTokenizer reconstructed from dict")
+                    logger.info("TextTokenizer reconstructed from dict (format 1)")
+                
+                # Format 2: Has 'word_index' and 'config' keys (Keras tokenizer state)
+                elif 'word_index' in loaded_data and 'config' in loaded_data:
+                    logger.info("Detected Keras tokenizer format, reconstructing...")
+                    
+                    # Import Keras Tokenizer
+                    from tensorflow.keras.preprocessing.text import Tokenizer
+                    from tensorflow.keras.preprocessing.sequence import pad_sequences
+                    
+                    # Get config - handle both dict and string formats
+                    config_data = loaded_data['config']
+                    logger.info(f"Config type: {type(config_data)}")
+                    logger.info(f"Config value: {config_data}")
+                    
+                    # If config is a string, try to parse it
+                    if isinstance(config_data, str):
+                        import json
+                        try:
+                            config = json.loads(config_data)
+                            logger.info("Parsed config from JSON string")
+                        except:
+                            # Default values if parsing fails
+                            logger.warning("Could not parse config, using defaults")
+                            config = {'vocab_size': 20000, 'max_length': 100}
+                    else:
+                        config = config_data
+                    
+                    # Get vocab_size and max_length with fallback
+                    if isinstance(config, dict):
+                        vocab_size = config.get('vocab_size', 20000)
+                        max_length = config.get('max_length', 100)
+                    else:
+                        logger.warning(f"Config is not a dict, using defaults. Config type: {type(config)}")
+                        vocab_size = 20000
+                        max_length = 100
+                    
+                    logger.info(f"Using: vocab_size={vocab_size}, max_length={max_length}")
+                    
+                    # Reconstruct Keras tokenizer from saved state
+                    keras_tokenizer = Tokenizer(num_words=vocab_size, oov_token='<OOV>')
+
+                    # Get word_index and validate it
+                    word_index_data = loaded_data['word_index']
+                    logger.info(f"word_index type: {type(word_index_data)}")
+
+                    # CRITICAL FIX: Ensure word_index is a proper dict with string keys
+                    if isinstance(word_index_data, dict):
+                        # Ensure all keys are strings (Keras requirement)
+                        cleaned_word_index = {}
+                        for key, value in word_index_data.items():
+                            if isinstance(key, str):
+                                cleaned_word_index[key] = int(value)
+                            else:
+                                # Convert non-string keys to strings
+                                cleaned_word_index[str(key)] = int(value)
+                        
+                        keras_tokenizer.word_index = cleaned_word_index
+                        logger.info(f"✓ word_index properly formatted with {len(cleaned_word_index)} entries")
+                    elif isinstance(word_index_data, str):
+                        logger.error("word_index is a STRING - tokenizer file is corrupted!")
+                        logger.error(f"word_index value: {word_index_data[:200]}")
+                        raise ValueError("Tokenizer file corrupted: word_index is a string instead of dict")
+                    else:
+                        logger.error(f"Unexpected word_index type: {type(word_index_data)}")
+                        raise ValueError(f"Cannot load tokenizer: word_index has type {type(word_index_data)}")
+
+                    # Restore index_word if available
+                    if 'index_word' in loaded_data:
+                        index_word_data = loaded_data['index_word']
+                        if isinstance(index_word_data, dict):
+                            # Ensure keys are integers and values are strings
+                            cleaned_index_word = {}
+                            for key, value in index_word_data.items():
+                                try:
+                                    cleaned_index_word[int(key)] = str(value)
+                                except (ValueError, TypeError):
+                                    logger.warning(f"Skipping invalid index_word entry: {key} → {value}")
+                            keras_tokenizer.index_word = cleaned_index_word
+                        else:
+                            logger.warning(f"index_word has unexpected type: {type(index_word_data)}")
+
+                    # Restore additional tokenizer config if available
+                    if 'tokenizer_config' in loaded_data:
+                        tokenizer_config = loaded_data['tokenizer_config']
+                        logger.info(f"Tokenizer config type: {type(tokenizer_config)}")
+                        if isinstance(tokenizer_config, dict):
+                            for key, value in tokenizer_config.items():
+                                if hasattr(keras_tokenizer, key) and key not in ['word_index', 'index_word']:
+                                    try:
+                                        setattr(keras_tokenizer, key, value)
+                                    except Exception as e:
+                                        logger.warning(f"Could not set {key}: {e}")
+
+                    # Create wrapper class with proper error handling
+                    class KerasTokenizerWrapper:
+                        def __init__(self, tokenizer, max_length):
+                            self.tokenizer = tokenizer
+                            self.max_length = max_length
+                            self.is_fitted = True
+                        
+                        def texts_to_padded_sequences(self, texts):
+                            """Convert texts to padded sequences."""
+                            # DEFENSIVE: Ensure texts is a list of strings
+                            if isinstance(texts, str):
+                                logger.warning("texts_to_padded_sequences received string, converting to list")
+                                texts = [texts]
+                            elif not isinstance(texts, (list, tuple)):
+                                logger.warning(f"texts_to_padded_sequences received {type(texts)}, converting")
+                                texts = list(texts)
+                            
+                            # Ensure all elements are Python strings (not numpy strings)
+                            texts = [str(t) for t in texts]
+                            
+                            logger.info(f"Converting {len(texts)} texts to sequences")
+                            
+                            try:
+                                sequences = self.tokenizer.texts_to_sequences(texts)
+                            except AttributeError as e:
+                                logger.error(f"AttributeError in texts_to_sequences: {e}")
+                                logger.error(f"tokenizer.word_index type: {type(self.tokenizer.word_index)}")
+                                if hasattr(self.tokenizer, 'word_index'):
+                                    logger.error(f"word_index keys sample: {list(self.tokenizer.word_index.keys())[:5]}")
+                                raise
+                            except Exception as e:
+                                logger.error(f"Error in texts_to_sequences: {e}")
+                                raise
+                            
+                            logger.info(f"Sequences created, padding to length {self.max_length}")
+                            padded = pad_sequences(sequences, maxlen=self.max_length, 
+                                                padding='post', truncating='post')
+                            logger.info(f"Padded sequences shape: {padded.shape}")
+                            return padded
+
+                    # Use the wrapper
+                    self.tokenizer = KerasTokenizerWrapper(keras_tokenizer, max_length)
+
+                    logger.info("✓ Keras tokenizer successfully reconstructed")
+                    logger.info(f"  Vocabulary size: {len(keras_tokenizer.word_index)}")
+                    logger.info(f"  Sample words: {list(keras_tokenizer.word_index.keys())[:10]}")
+
+                
                 else:
-                    logger.error("Dict format tokenizer missing 'tokenizer' key")
+                    error_msg = f"Dict format tokenizer has unexpected keys: {list(loaded_data.keys())}"
+                    logger.error(error_msg)
+                    if self.model_type == 'deep_learning':
+                        raise RuntimeError(error_msg)
                     self.tokenizer = None
-            
             else:
-                logger.error(f"Unexpected tokenizer type: {type(loaded_data)}")
+                error_msg = f"Unexpected tokenizer type: {type(loaded_data)}"
+                logger.error(error_msg)
+                if self.model_type == 'deep_learning':
+                    raise RuntimeError(error_msg)
                 self.tokenizer = None
+            
+            # Verify tokenizer has required method
+            if self.tokenizer and not hasattr(self.tokenizer, 'texts_to_padded_sequences'):
+                error_msg = f"Tokenizer missing 'texts_to_padded_sequences' method"
+                logger.error(error_msg)
+                if self.model_type == 'deep_learning':
+                    raise RuntimeError(error_msg)
+                self.tokenizer = None
+            
+            if self.tokenizer:
+                logger.info("✓ Tokenizer loaded and verified successfully")
         
         except Exception as e:
             logger.error(f"Error loading tokenizer: {e}")
             import traceback
             traceback.print_exc()
+            if self.model_type == 'deep_learning':
+                raise RuntimeError(f"Failed to load tokenizer required for deep learning models: {e}")
             self.tokenizer = None
-
+    
     def _load_model(self, model_name: str):
-        """Load the specified model (model_name should already be resolved)."""
-        # Get model file path
-        model_key = model_name.lower().replace(' ', '_')
-        
-        if model_key not in MODEL_FILES:
-            available = [k for k in MODEL_FILES.keys() if k not in ['tokenizer', 'feature_extractor']]
-            raise ValueError(
-                f"Model '{model_name}' not found. Available: {available}"
-            )
-        
-        model_path = MODEL_FILES[model_key]
-        
-        if not model_path.exists():
-            raise FileNotFoundError(
-                f"Model file not found: {model_path}. "
-                "Please train the models first."
-            )
+        """Load the specified model (Traditional ML, PyTorch DL, or BERT)."""
+        model_key = model_name.lower().replace(' ', '_').replace('-', '_')
         
         try:
-            if self.model_type == 'deep_learning':
-                # Load deep learning model
-                self._load_dl_model(model_path, model_key)
+            if self.model_type == 'bert':
+                self._load_bert_model(model_name, model_key)
+            elif self.model_type == 'deep_learning':
+                self._load_pytorch_dl_model(model_name, model_key)
             else:
-                # Load traditional ML model
-                self.model = joblib.load(model_path)
+                self._load_traditional_model(model_key)
             
             logger.info(f"Loaded model: {model_name} ({self.model_type})")
         except Exception as e:
             logger.error(f"Error loading model {model_name}: {e}")
             raise
     
-    def _load_dl_model(self, model_path: Path, model_key: str):
-        """Load a deep learning model."""
+    def _load_traditional_model(self, model_key: str):
+        """Load a traditional ML model."""
+        if model_key not in MODEL_FILES:
+            available = [k for k in MODEL_FILES.keys() if k not in ['tokenizer', 'feature_extractor']]
+            raise ValueError(f"Model '{model_key}' not found. Available: {available}")
+        
+        model_path = MODEL_FILES[model_key]
+        
+        if not model_path.exists():
+            raise FileNotFoundError(f"Model file not found: {model_path}")
+        
+        self.model = joblib.load(model_path)
+        logger.info(f"Loaded traditional ML model from {model_path}")
+    
+    def _load_pytorch_dl_model(self, model_name: str, model_key: str):
+        """Load a PyTorch deep learning model (.pt file)."""
+        if not HAS_TORCH:
+            raise ImportError("PyTorch not installed. Cannot load deep learning models.")
+        
+        # Import PyTorch model classes
         try:
-            if 'bert' in model_key:
-                # Load BERT model
-                from models.deep_learning.bert_model import BERTModel
-                from config import BERT_CONFIG
-                self.model = BERTModel(config=BERT_CONFIG)
-                self.model.load(str(model_path))
-                
-            elif 'cnn' in model_key:
-                # Load CNN model
+            if 'cnn' in model_key:
                 from models.deep_learning.cnn_model import CNNModel
                 from config import CNN_CONFIG
-                
-                # Create model instance
-                self.model = CNNModel(config=CNN_CONFIG)
-                
-                # Load the saved Keras model directly
-                import tensorflow as tf
-                keras_model = tf.keras.models.load_model(str(model_path))
-                self.model.model = keras_model
-                
-                logger.info(f"CNN model loaded successfully from {model_path}")
-                
+                model_class = CNNModel
+                config = CNN_CONFIG
             elif 'bilstm' in model_key:
-                # Load BiLSTM model
                 from models.deep_learning.bilstm_model import BiLSTMModel
                 from config import BILSTM_CONFIG
-                
-                self.model = BiLSTMModel(config=BILSTM_CONFIG)
-                
-                # Load the saved Keras model directly
-                import tensorflow as tf
-                keras_model = tf.keras.models.load_model(str(model_path))
-                self.model.model = keras_model
-                
-                logger.info(f"BiLSTM model loaded successfully from {model_path}")
-                
+                model_class = BiLSTMModel
+                config = BILSTM_CONFIG
             elif 'lstm' in model_key:
-                # Load LSTM model
                 from models.deep_learning.lstm_model import LSTMModel
                 from config import LSTM_CONFIG
-                
-                self.model = LSTMModel(config=LSTM_CONFIG)
-                
-                # Load the saved Keras model directly
-                import tensorflow as tf
-                keras_model = tf.keras.models.load_model(str(model_path))
-                self.model.model = keras_model
-                
-                logger.info(f"LSTM model loaded successfully from {model_path}")
-                
+                model_class = LSTMModel
+                config = LSTM_CONFIG
             else:
-                raise ValueError(f"Unknown deep learning model type: {model_key}")
+                raise ValueError(f"Unknown PyTorch DL model type: {model_key}")
+            
+            # Create model instance
+            self.model = model_class(config=config)
+            
+            # Load PyTorch state dict
+            model_path = MODEL_FILES.get(model_key)
+            if not model_path:
+                # Fallback: try to find .pt file in deep_learning directory
+                dl_dir = MODELS_DIR / 'deep_learning'
+                model_path = dl_dir / f"{model_key}.pt"
+            
+            if not model_path.exists():
+                raise FileNotFoundError(f"PyTorch model file not found: {model_path}")
+            
+            # Build model architecture first
+            self.model.build_model()
+            
+            # Load checkpoint
+            checkpoint = torch.load(model_path, map_location='cpu')
+            logger.info(f"Loaded PyTorch checkpoint from {model_path}")
+            
+            # Extract state_dict from checkpoint (FIX for the error)
+            if isinstance(checkpoint, dict) and 'model_state_dict' in checkpoint:
+                state_dict = checkpoint['model_state_dict']
+                logger.info("Extracted 'model_state_dict' from checkpoint")
                 
+                # Log additional checkpoint info if available
+                if 'config' in checkpoint:
+                    logger.info(f"Checkpoint config available")
+                if 'history' in checkpoint:
+                    logger.info(f"Training history available in checkpoint")
+            else:
+                # Checkpoint is already a state_dict
+                state_dict = checkpoint
+                logger.info("Using checkpoint directly as state_dict")
+            
+            # Load state dict into model
+            self.model.model.load_state_dict(state_dict)
+            self.model.model.eval()
+            
+            logger.info(f"PyTorch DL model loaded successfully and set to eval mode")
+            
         except Exception as e:
-            logger.error(f"Error loading deep learning model: {e}")
+            logger.error(f"Error loading PyTorch DL model: {e}")
             import traceback
             traceback.print_exc()
             raise
-
+    
+    def _load_bert_model(self, model_name: str, model_key: str):
+        """Load a BERT model from saved directory."""
+        if not HAS_TORCH:
+            raise ImportError("PyTorch not installed. Cannot load BERT models.")
+        
+        try:
+            # Import BERT model class
+            from bert_model_heavy_gpu import HeavyGPUBERTModel
+            
+            # BERT models are saved in directories like saved_models/bert_bert_base
+            bert_dir = MODELS_DIR / f"bert_{model_key}"
+            
+            # Alternative: try without 'bert_' prefix
+            if not bert_dir.exists():
+                bert_dir = MODELS_DIR / model_key
+            
+            if not bert_dir.exists():
+                raise FileNotFoundError(f"BERT model directory not found: {bert_dir}")
+            
+            logger.info(f"Loading BERT model from {bert_dir}")
+            
+            # Load the BERT model using the static load method
+            self.model = HeavyGPUBERTModel.load(str(bert_dir))
+            
+            logger.info(f"BERT model loaded successfully from {bert_dir}")
+            
+        except Exception as e:
+            logger.error(f"Error loading BERT model: {e}")
+            import traceback
+            traceback.print_exc()
+            raise
+    
     def _prepare_input(self, texts: Union[str, List[str]]) -> np.ndarray:
         """Prepare input based on model type."""
         # Convert single text to list
@@ -314,28 +545,54 @@ class TweetClassifier:
             if self.feature_extractor is None:
                 raise RuntimeError("Feature extractor not loaded")
             return self.feature_extractor.transform(texts)
-        else:
-            # Use tokenizer for deep learning
+        
+        elif self.model_type == 'bert':
+            # BERT uses raw text - return as-is
+            return texts
+        
+        else:  # deep_learning
+            # Use tokenizer for PyTorch DL
             if self.tokenizer is None:
-                raise RuntimeError(
-                    f"Tokenizer not loaded. Cannot use deep learning model '{self.model_name}'. "
-                    "Please use a traditional ML model instead (e.g., model_name='mlp')"
+                error_msg = (
+                    f"Tokenizer not loaded. Cannot use deep learning model '{self.model_name}'.\n"
+                    f"Possible causes:\n"
+                    f"1. Tokenizer file doesn't exist at the configured path\n"
+                    f"2. Tokenizer failed to load (check logs above for errors)\n"
+                    f"3. You need to train the tokenizer first\n"
+                    f"\nSolutions:\n"
+                    f"- Run: python diagnose_tokenizer.py (to check tokenizer status)\n"
+                    f"- Or use a traditional ML model instead: model_name='xgboost' or 'mlp'\n"
+                    f"- Or train/retrain the deep learning models to generate the tokenizer"
                 )
+                logger.error(error_msg)
+                raise RuntimeError(error_msg)
             
-            # Check if tokenizer has the method
             if not hasattr(self.tokenizer, 'texts_to_padded_sequences'):
                 raise AttributeError(
                     f"Tokenizer (type: {type(self.tokenizer)}) doesn't have "
                     "'texts_to_padded_sequences' method."
                 )
             
-            # Tokenize texts
             try:
+                # Additional validation before calling tokenizer
+                if not isinstance(texts, (list, tuple)):
+                    texts = [texts]
+                
+                # Ensure all elements are Python strings
+                texts = [str(t) if not isinstance(t, str) else t for t in texts]
+                
+                logger.debug(f"Prepared texts type: {type(texts)}, sample: {texts[:50] if texts else 'empty'}")
                 return self.tokenizer.texts_to_padded_sequences(texts)
+            except AttributeError as e:
+                logger.error(f"Attribute error in tokenizer: {e}")
+                logger.error(f"texts: {texts}")
+                logger.error(f"tokenizer type: {type(self.tokenizer)}")
+                raise
             except Exception as e:
                 logger.error(f"Error tokenizing texts: {e}")
+                logger.error(f"texts type: {type(texts)}, length: {len(texts) if hasattr(texts, '__len__') else 'N/A'}")
                 raise
-    
+ 
     def predict(self, texts: Union[str, List[str]]) -> np.ndarray:
         """
         Predict class labels for texts.
@@ -349,11 +606,7 @@ class TweetClassifier:
         single_input = isinstance(texts, str)
         
         # Prepare input
-        if self.model_type == 'deep_learning' and 'bert' in self.model_name.lower():
-            # BERT uses raw text
-            input_data = [texts] if single_input else texts
-        else:
-            input_data = self._prepare_input(texts)
+        input_data = self._prepare_input(texts)
         
         # Predict
         predictions = self.model.predict(input_data)
@@ -377,10 +630,7 @@ class TweetClassifier:
         single_input = isinstance(texts, str)
         
         # Prepare input
-        if self.model_type == 'deep_learning' and 'bert' in self.model_name.lower():
-            input_data = [texts] if single_input else texts
-        else:
-            input_data = self._prepare_input(texts)
+        input_data = self._prepare_input(texts)
         
         # Predict probabilities
         if hasattr(self.model, 'predict_proba'):
@@ -713,7 +963,6 @@ def demo_basic():
     print("DEMO 1: BASIC CLASSIFICATION (PHASE 1-3)")
     print("=" * 80)
     
-    # Sample tweets
     tweets = [
         "I will kill you fucking bitch",
         "You're such an idiot",
@@ -722,7 +971,6 @@ def demo_basic():
     ]
     
     try:
-        # Initialize classifier (uses best model)
         classifier = TweetClassifier()
         
         print(f"\nUsing model: {classifier.model_name} ({classifier.model_type})")
@@ -746,7 +994,6 @@ def demo_with_severity():
     print("DEMO 2: COMPLETE CLASSIFICATION WITH SEVERITY (PHASE 4)")
     print("=" * 80)
     
-    # Sample tweets with different severity levels
     tweets = [
         {
             'text': "I will kill you and your family you fucking bitch",
@@ -784,110 +1031,15 @@ def demo_with_severity():
         traceback.print_exc()
 
 
-def demo_compare_models():
-    """Demo 3: Compare different models."""
-    print("\n" + "=" * 80)
-    print("DEMO 3: COMPARE DIFFERENT MODELS")
-    print("=" * 80)
-    
-    tweet = "I will fucking kill you bitch"
-    models_to_test = ['best', 'xgboost', 'cnn', 'bilstm']
-    
-    print(f"\nTest tweet: {tweet}\n")
-    
-    for model_name in models_to_test:
-        try:
-            print(f"\n--- Testing {model_name.upper()} ---")
-            classifier = TweetClassifier(model_name=model_name)
-            result = classifier.classify_tweet(tweet, verbose=False)
-            
-            print(f"Model: {result['model_name']} ({result['model_type']})")
-            print(f"Prediction: {result['prediction']}")
-            print(f"Confidence: {result['confidence']:.1%}")
-            
-        except Exception as e:
-            print(f"Error loading {model_name}: {e}")
-
-
-def demo_batch_classification():
-    """Demo 4: Batch classification of multiple tweets."""
-    print("\n" + "=" * 80)
-    print("DEMO 4: BATCH CLASSIFICATION")
-    print("=" * 80)
-    
-    tweets = [
-        "I hate you so much",
-        "You're wonderful!",
-        "Go kill yourself",
-        "That's interesting",
-        "Fuck off bitch"
-    ]
-    
-    try:
-        classifier = TweetClassifier()
-        
-        print(f"\nClassifying {len(tweets)} tweets with {classifier.model_name}...\n")
-        
-        results = classifier.predict_with_details(tweets)
-        
-        for i, (tweet, result) in enumerate(zip(tweets, results), 1):
-            print(f"{i}. \"{tweet}\"")
-            print(f"   -> {result['prediction']} ({result['confidence']:.1%})")
-    
-    except Exception as e:
-        print(f"Error: {e}")
-        import traceback
-        traceback.print_exc()
-
-
-def demo_detailed_analysis():
-    """Demo 5: Detailed analysis with all information."""
-    print("\n" + "=" * 80)
-    print("DEMO 5: DETAILED ANALYSIS (ALL FEATURES)")
-    print("=" * 80)
-    
-    tweet = "I will fucking kill you, you fucking bitch you whore"
-    
-    try:
-        classifier = TweetClassifier()
-        
-        print(f"\nAnalyzing tweet: \"{tweet}\"\n")
-        
-        # Get complete analysis with verbose output
-        result = classifier.classify_with_severity(tweet, verbose=True)
-        
-        # Also show model info
-        print("\n" + "=" * 80)
-        print("MODEL INFORMATION")
-        print("=" * 80)
-        info = classifier.get_model_info()
-        print(f"Model: {info['model_name']}")
-        print(f"Type: {info['model_type']}")
-        print(f"Class: {info['model_class']}")
-        if 'metrics' in info:
-            print(f"\nModel Performance:")
-            print(f"  Accuracy: {info['metrics']['accuracy']:.4f}")
-            print(f"  F1-Macro: {info['metrics']['f1_macro']:.4f}")
-            print(f"  F1-Weighted: {info['metrics']['f1_weighted']:.4f}")
-    
-    except Exception as e:
-        print(f"Error: {e}")
-        import traceback
-        traceback.print_exc()
-
-
 def demo():
     """Run all demos."""
     print("\n" + "=" * 80)
-    print("HATE SPEECH CLASSIFIER - ALL DEMOS")
+    print("HATE SPEECH CLASSIFIER - DEMOS")
     print("=" * 80)
     
     demos = [
         ("Basic Classification", demo_basic),
-        ("With Severity Analysis", demo_with_severity),
-        ("Compare Models", demo_compare_models),
-        ("Batch Classification", demo_batch_classification),
-        ("Detailed Analysis", demo_detailed_analysis)
+        ("With Severity Analysis", demo_with_severity)
     ]
     
     for name, demo_func in demos:
@@ -910,21 +1062,13 @@ if __name__ == "__main__":
     import sys
     
     if len(sys.argv) > 1:
-        # Run specific demo
         demo_name = sys.argv[1].lower()
         if demo_name == 'basic':
             demo_basic()
         elif demo_name == 'severity':
             demo_with_severity()
-        elif demo_name == 'compare':
-            demo_compare_models()
-        elif demo_name == 'batch':
-            demo_batch_classification()
-        elif demo_name == 'detailed':
-            demo_detailed_analysis()
         else:
             print(f"Unknown demo: {demo_name}")
-            print("Available demos: basic, severity, compare, batch, detailed")
+            print("Available demos: basic, severity")
     else:
-        # Run all demos
         demo()

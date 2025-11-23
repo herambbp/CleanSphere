@@ -589,10 +589,10 @@ MODEL_FILES = {
     'mlp': TRADITIONAL_ML_DIR / 'neural_network.pkl',
     
     # Deep Learning Models (Phase 5)
-    'lstm': DEEP_LEARNING_DIR / 'lstm_model.keras',
-    'bilstm': DEEP_LEARNING_DIR / 'bilstm_model.keras',
-    'cnn': DEEP_LEARNING_DIR / 'cnn_model.keras',
-    'bert': DEEP_LEARNING_DIR / 'bert_model',
+    'lstm': DEEP_LEARNING_DIR / 'lstm_model.pt',
+    'bilstm': DEEP_LEARNING_DIR / 'bilstm_model.pt',
+    'cnn': DEEP_LEARNING_DIR / 'cnn_model_improved.pt',
+    'bert': DEEP_LEARNING_DIR / 'bert_bert_base',
     'tokenizer': DEEP_LEARNING_DIR / 'tokenizer.pkl',
 }
 
